@@ -21,6 +21,7 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { EventsModule } from './modules/events/events.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { EmailModule } from './modules/notifications/email/email.module';
 import { SmsModule } from './modules/notifications/sms/sms.module';
 import { WebsocketModule } from './modules/notifications/websocket/websocket.module';
@@ -76,6 +77,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
     PayrollModule,
 
     // Notification Modules
+    NotificationsModule,
     EmailModule,
     SmsModule,
     WebsocketModule,
