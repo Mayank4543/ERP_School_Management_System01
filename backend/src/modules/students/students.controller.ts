@@ -25,7 +25,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) {}
+  constructor(private readonly studentsService: StudentsService) { }
 
   @Post()
   @Roles('admin', 'superadmin')
@@ -54,6 +54,13 @@ export class StudentsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
+    // Debug logging
+    console.log('🔍 findAll called with:');
+    console.log('  user.schoolId:', user?.schoolId);
+    console.log('  user object:', user);
+    console.log('  academicYearId:', academicYearId);
+    console.log('  standard:', standard);
+
     const result = await this.studentsService.findAll(
       user.schoolId,
       academicYearId,

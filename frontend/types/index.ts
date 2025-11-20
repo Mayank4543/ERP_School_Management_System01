@@ -147,6 +147,7 @@ export interface Student {
 // Teacher
 export interface Teacher {
   _id: string;
+  user_id?: string; // Reference to User record
   school_id: string;
   employee_id: string;
   first_name: string;

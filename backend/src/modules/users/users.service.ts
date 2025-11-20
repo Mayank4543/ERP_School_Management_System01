@@ -11,9 +11,19 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(UserProfile.name) private userProfileModel: Model<UserProfileDocument>,
     @InjectModel('School') private schoolModel: Model<any>,
-  ) {}
+  ) { }
 
   async create(createUserDto: any): Promise<User> {
+    // Hash password if provided
+    if (createUserDto.password) {
+      createUserDto.password = await this.hashPassword(createUserDto.password);
+    }
+
+    // Set school_id as ObjectId if it's a string
+    if (createUserDto.school_id && typeof createUserDto.school_id === 'string') {
+      createUserDto.school_id = new Types.ObjectId(createUserDto.school_id);
+    }
+
     const createdUser = new this.userModel(createUserDto);
     return createdUser.save();
   }

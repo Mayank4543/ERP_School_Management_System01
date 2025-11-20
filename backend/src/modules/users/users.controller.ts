@@ -6,11 +6,26 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Get()
   async findAll(@CurrentUser() user: any, @Query() query: any) {
     return this.usersService.findAll(user.schoolId, query);
+  }
+
+  @Post()
+  async create(@Body() createUserDto: any, @CurrentUser() currentUser: any) {
+    // Set school_id from current user if not provided
+    if (!createUserDto.school_id && currentUser.schoolId) {
+      createUserDto.school_id = currentUser.schoolId;
+    }
+
+    const user = await this.usersService.create(createUserDto);
+    return {
+      success: true,
+      message: 'User created successfully',
+      data: user,
+    };
   }
 
   @Get(':id')
@@ -29,8 +44,23 @@ export class UsersController {
     return { message: 'User deleted successfully' };
   }
 
+  @Post(':id/profile')
+  async createProfile(@Param('id') id: string, @Body() profileData: any) {
+    const profile = await this.usersService.createProfile(id, profileData);
+    return {
+      success: true,
+      message: 'Profile created successfully',
+      data: profile,
+    };
+  }
+
   @Put(':id/profile')
   async updateProfile(@Param('id') id: string, @Body() profileData: any) {
-    return this.usersService.updateProfile(id, profileData);
+    const profile = await this.usersService.updateProfile(id, profileData);
+    return {
+      success: true,
+      message: 'Profile updated successfully',
+      data: profile,
+    };
   }
 }

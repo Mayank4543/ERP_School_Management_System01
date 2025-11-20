@@ -21,6 +21,7 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { EventsModule } from './modules/events/events.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { EmailModule } from './modules/notifications/email/email.module';
 import { SmsModule } from './modules/notifications/sms/sms.module';
@@ -30,6 +31,9 @@ import { ExcelModule } from './modules/reports/excel/excel.module';
 import { RedisModule } from './modules/cache/redis.module';
 import { QueueModule } from './modules/queues/queue.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
@@ -75,6 +79,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
     EventsModule,
     LeavesModule,
     PayrollModule,
+    SuperAdminModule,
 
     // Notification Modules
     NotificationsModule,
@@ -92,6 +97,15 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
     // Activity Log Module
     ActivityLogModule,
+
+    // Dashboard Module
+    DashboardModule,
+
+    // Reports Module
+    ReportsModule,
+
+    // Upload Module
+    UploadModule,
   ],
   controllers: [],
   providers: [

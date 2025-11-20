@@ -15,7 +15,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
@@ -34,18 +34,25 @@ export class AuthService {
       throw new UnauthorizedException('Account is not activated');
     }
 
+    // Convert Mongoose document to plain object
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = user as any;
+    const { password: _, ...result } = userObj;
     return result;
   }
 
   async login(user: any) {
+    // Ensure user object has required fields
+    if (!user || !user._id) {
+      throw new UnauthorizedException('Invalid user data');
+    }
+
     const payload: JwtPayload = {
       sub: user._id.toString(),
-      email: user.email,
+      email: user.email || '',
       schoolId: user.school_id ? user.school_id.toString() : 'default',
       userGroupId: user.usergroup_id || 'user',
-      roles: user.roles || [],
+      roles: user.roles || [user.usergroup_id] || ['user'],
     };
 
     return {
@@ -56,12 +63,17 @@ export class AuthService {
         token_type: 'Bearer',
         expires_in: '7d',
         user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          school_id: user.school_id || null,
+          id: user._id.toString(),
+          name: user.name || '',
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          email: user.email || '',
+          phone: user.mobile_no || '',
+          profile_picture: user.profile_picture || '',
+          school_id: user.school_id ? user.school_id.toString() : null,
           usergroup_id: user.usergroup_id || null,
           roles: user.roles || [],
+          ref_id: user.ref_id ? user.ref_id.toString() : user._id.toString(),
         },
       },
     };
@@ -79,16 +91,23 @@ export class AuthService {
 
     // Get or create school_id
     let schoolId = registerDto.school_id;
-    
+
     if (!schoolId) {
       // If no school_id provided, get the first available school or create a default one
       const schools = await this.usersService.getOrCreateDefaultSchool();
       schoolId = schools._id.toString();
     }
 
+    // Parse name to extract first and last names
+    const nameParts = registerDto.name.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     // Create user
     const user = await this.usersService.create({
       name: registerDto.name,
+      first_name: firstName,
+      last_name: lastName,
       email: registerDto.email,
       password: hashedPassword,
       school_id: schoolId,
@@ -103,8 +122,8 @@ export class AuthService {
     try {
       await this.usersService.createProfile(user._id.toString(), {
         school_id: schoolId,
-        firstname: registerDto.name.split(' ')[0],
-        lastname: registerDto.name.split(' ').slice(1).join(' ') || '',
+        firstname: firstName,
+        lastname: lastName,
         status: 'active',
       });
     } catch (error) {
@@ -140,5 +159,86 @@ export class AuthService {
       success: true,
       message: 'Password changed successfully',
     };
+  }
+
+  async updateProfile(userId: string, profileData: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    profile_picture?: string;
+  }) {
+    try {
+      const user = await this.usersService.findById(userId);
+      
+      // Prepare updates for User model
+      const userUpdateData: any = {};
+      
+      if (profileData.first_name !== undefined) {
+        userUpdateData.first_name = profileData.first_name;
+      }
+      
+      if (profileData.last_name !== undefined) {
+        userUpdateData.last_name = profileData.last_name;
+      }
+      
+      if (profileData.phone !== undefined) {
+        userUpdateData.mobile_no = profileData.phone;
+      }
+      
+      if (profileData.profile_picture !== undefined) {
+        userUpdateData.profile_picture = profileData.profile_picture;
+      }
+      
+      // Update name field if first_name or last_name changed
+      if (profileData.first_name || profileData.last_name) {
+        const firstName = profileData.first_name || user.first_name;
+        const lastName = profileData.last_name || user.last_name;
+        userUpdateData.name = `${firstName} ${lastName}`.trim();
+      }
+
+      // Update User model
+      const updatedUser = await this.usersService.update(userId, userUpdateData);
+      
+      // Prepare updates for UserProfile model (if needed)
+      const profileUpdateData: any = {};
+      
+      if (profileData.first_name !== undefined) {
+        profileUpdateData.firstname = profileData.first_name;
+      }
+      
+      if (profileData.last_name !== undefined) {
+        profileUpdateData.lastname = profileData.last_name;
+      }
+      
+      if (profileData.profile_picture !== undefined) {
+        profileUpdateData.profile_picture = profileData.profile_picture;
+      }
+      
+      // Update UserProfile if there are profile-specific updates
+      if (Object.keys(profileUpdateData).length > 0) {
+        try {
+          await this.usersService.updateProfile(userId, profileUpdateData);
+        } catch (error) {
+          console.log('Profile update failed (may not exist):', error.message);
+          // Continue even if profile update fails
+        }
+      }
+      
+      return {
+        success: true,
+        message: 'Profile updated successfully',
+        data: {
+          id: updatedUser._id,
+          first_name: updatedUser.first_name,
+          last_name: updatedUser.last_name,
+          name: updatedUser.name,
+          phone: updatedUser.mobile_no,
+          profile_picture: updatedUser.profile_picture,
+          email: updatedUser.email,
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 }

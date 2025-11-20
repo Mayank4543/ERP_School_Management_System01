@@ -163,9 +163,14 @@ export default function RegisterPage() {
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
               <SelectContent>
-                {/* Only allow Student and Parent for public registration */}
+                <SelectItem value="superadmin">Super Admin</SelectItem>
+                <SelectItem value="admin">School Admin</SelectItem>
+                <SelectItem value="teacher">Teacher</SelectItem>
                 <SelectItem value="student">Student</SelectItem>
                 <SelectItem value="parent">Parent</SelectItem>
+                <SelectItem value="librarian">Librarian</SelectItem>
+                <SelectItem value="accountant">Accountant</SelectItem>
+                <SelectItem value="receptionist">Receptionist</SelectItem>
               </SelectContent>
               </Select>
               {errors.usergroup_id && (

@@ -21,6 +21,12 @@ export class School {
   @Prop()
   address: string;
 
+  @Prop({ required: true, trim: true })
+  state: string;
+
+  @Prop({ required: true, trim: true })
+  city: string;
+
   @Prop({ type: Types.ObjectId, ref: 'Country' })
   country_id: Types.ObjectId;
 
@@ -30,7 +36,7 @@ export class School {
   @Prop({ type: Types.ObjectId, ref: 'City' })
   city_id: Types.ObjectId;
 
-  @Prop({ trim: true })
+  @Prop({ required: true, trim: true })
   pincode: string;
 
   @Prop({ unique: true, trim: true, lowercase: true })

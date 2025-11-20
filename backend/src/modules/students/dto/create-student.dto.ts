@@ -108,6 +108,26 @@ export class CreateStudentDto {
   @IsMongoId({ each: true })
   parent_ids?: string[];
 
+  @ApiPropertyOptional({ description: 'Father Name', example: 'John Doe' })
+  @IsOptional()
+  @IsString()
+  father_name?: string;
+
+  @ApiPropertyOptional({ description: 'Mother Name', example: 'Jane Doe' })
+  @IsOptional()
+  @IsString()
+  mother_name?: string;
+
+  @ApiPropertyOptional({ description: 'Parent Contact Number', example: '+1234567890' })
+  @IsOptional()
+  @IsString()
+  parent_contact?: string;
+
+  @ApiPropertyOptional({ description: 'Parent Email', example: 'parent@example.com' })
+  @IsOptional()
+  @IsString()
+  parent_email?: string;
+
   @ApiPropertyOptional({
     description: 'Medical Information',
     type: 'object',

@@ -53,6 +53,7 @@ interface DataTableProps<T> {
   onExport?: () => void;
   searchPlaceholder?: string;
   showExport?: boolean;
+  showSearch?: boolean;
   emptyMessage?: string;
 }
 
@@ -68,6 +69,7 @@ export function DataTable<T extends Record<string, any>>({
   onExport,
   searchPlaceholder = 'Search...',
   showExport = true,
+  showSearch = true,
   emptyMessage = 'No data found',
 }: DataTableProps<T>) {
   const [searchValue, setSearchValue] = useState('');
@@ -94,26 +96,30 @@ export function DataTable<T extends Record<string, any>>({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1 max-w-sm">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchValue}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+      {(showSearch || (showExport && onExport)) && (
+        <div className="flex items-center justify-between gap-4">
+          {showSearch && (
+            <div className="flex items-center gap-2 flex-1 max-w-sm">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+          )}
+
+          {showExport && onExport && (
+            <Button variant="outline" size="sm" onClick={onExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          )}
         </div>
-        
-        {showExport && onExport && (
-          <Button variant="outline" size="sm" onClick={onExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        )}
-      </div>
+      )}
 
       {/* Table */}
       <div className="border rounded-lg">
@@ -153,17 +159,21 @@ export function DataTable<T extends Record<string, any>>({
               </TableRow>
             ) : (
               // Data rows
-              data.map((row, rowIndex) => (
-                <TableRow key={rowIndex}>
-                  {columns.map((column) => (
-                    <TableCell key={column.key}>
-                      {column.render
-                        ? column.render(row[column.key], row)
-                        : row[column.key] || '-'}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              data.map((row, rowIndex) => {
+                // Use _id if available, otherwise fall back to index
+                const uniqueKey = row._id || row.id || `row-${rowIndex}`;
+                return (
+                  <TableRow key={uniqueKey}>
+                    {columns.map((column) => (
+                      <TableCell key={column.key}>
+                        {column.render
+                          ? column.render(row[column.key], row)
+                          : row[column.key] || '-'}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -194,7 +204,7 @@ export function DataTable<T extends Record<string, any>>({
             <span className="text-sm text-gray-600">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
             </span>
-            
+
             <div className="flex gap-1">
               <Button
                 variant="outline"

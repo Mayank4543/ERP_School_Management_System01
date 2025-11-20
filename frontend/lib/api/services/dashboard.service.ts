@@ -44,6 +44,99 @@ export interface StudentDashboardData {
   }>;
 }
 
+export interface TeacherDashboardData {
+  teacher_info: {
+    name: string;
+    employee_id: string;
+    subjects: string[];
+    email: string;
+    phone: string;
+  };
+  stats: {
+    my_classes: number;
+    total_students: number;
+    today_classes: number;
+    pending_grading: number;
+  };
+  today_attendance: {
+    total: number;
+    present: number;
+    absent: number;
+    percentage: number;
+  };
+  upcoming_exams: Array<{
+    id: string;
+    name: string;
+    exam_type: string;
+    date: string;
+    status: string;
+  }>;
+  recent_activities: Array<{
+    action: string;
+    details: string;
+    time: string;
+  }>;
+}
+
+export interface AdminDashboardData {
+  overview: {
+    total_students: number;
+    total_teachers: number;
+    total_staff: number;
+    total_users: number;
+  };
+  today_attendance: {
+    total: number;
+    present: number;
+    absent: number;
+    percentage: number;
+  };
+  fee_collection: {
+    total_collected: number;
+    pending: number;
+    defaulters: number;
+  };
+  class_distribution: Array<{
+    class: number;
+    students: number;
+  }>;
+  recent_activities: Array<{
+    action: string;
+    user: string;
+    time: string;
+  }>;
+}
+
+export interface ParentChild {
+  id: string;
+  name: string;
+  admission_no: string;
+  class: number;
+  section: string;
+  roll_no: string;
+  status: string;
+}
+
+export interface ChildDashboardData {
+  student_info: {
+    id: string;
+    name: string;
+    class: number;
+    roll_no: string;
+    admission_no: string;
+  };
+  stats: {
+    attendance: number;
+    pending_assignments: number;
+    pending_homework: number;
+  };
+  attendance_summary: {
+    total_days: number;
+    present_days: number;
+    absent_days: number;
+  };
+}
+
 export const dashboardService = {
   /**
    * Get student dashboard data (composite API)
@@ -138,7 +231,10 @@ export const dashboardService = {
         percentage: (mark.obtained_marks / mark.total_marks) * 100,
       }));
 
-      // Mock data for features not yet available in backend
+      // TODO: Connect these when backend APIs are ready
+      // - Timetable API: /timetable/student/:studentId  
+      // - Assignments API: /assignments/student/:studentId
+      // - Homework API: /homework/student/:studentId
       const todaySchedule = [
         { time: '09:00 - 10:00', subject: 'Mathematics', teacher: 'Mr. Sharma', room: '101', status: 'completed' as const },
         { time: '10:00 - 11:00', subject: 'English', teacher: 'Ms. Gupta', room: '102', status: 'completed' as const },
@@ -175,6 +271,65 @@ export const dashboardService = {
       };
     } catch (error) {
       console.error('Error fetching student dashboard:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get teacher dashboard data - NEW API
+   */
+  async getTeacherDashboard(teacherId: string, date?: string): Promise<TeacherDashboardData> {
+    try {
+      const response = await apiClient.get(`/dashboard/teacher/${teacherId}`, {
+        params: date ? { date } : {},
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching teacher dashboard:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get admin dashboard data - NEW API
+   */
+  async getAdminDashboard(schoolId: string, startDate?: string, endDate?: string): Promise<AdminDashboardData> {
+    try {
+      const response = await apiClient.get(`/dashboard/admin/${schoolId}`, {
+        params: {
+          ...(startDate && { start_date: startDate }),
+          ...(endDate && { end_date: endDate }),
+        },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching admin dashboard:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get parent's children list - NEW API
+   */
+  async getParentChildren(parentId: string): Promise<ParentChild[]> {
+    try {
+      const response = await apiClient.get(`/dashboard/parent/${parentId}/students`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching parent children:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get child dashboard for parent - NEW API
+   */
+  async getChildDashboard(parentId: string, studentId: string): Promise<ChildDashboardData> {
+    try {
+      const response = await apiClient.get(`/dashboard/parent/${parentId}/child/${studentId}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching child dashboard:', error);
       throw error;
     }
   },

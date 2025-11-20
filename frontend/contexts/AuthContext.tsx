@@ -17,6 +17,9 @@ interface User {
   roles: string[];
   school_id: string | null;
   usergroup_id: string | null;
+  ref_id?: string | null;
+  profile_picture?: string;
+  phone?: string;
 }
 
 interface AuthContextType {
@@ -26,11 +29,26 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
-  updateUser: (user: User) => void;
+  updateUser: (updatedFields: Partial<User>) => void;
   hasRole: (roles: string | string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Role mapping from backend to frontend
+const mapBackendRoleToFrontend = (backendRole: string): string => {
+  const roleMapping: { [key: string]: string } = {
+    'superadmin': 'super_admin',
+    'admin': 'school_admin',
+    'teacher': 'teacher',
+    'student': 'student',
+    'parent': 'parent',
+    'accountant': 'accountant',
+    'librarian': 'librarian',
+    'receptionist': 'receptionist',
+  };
+  return roleMapping[backendRole] || backendRole;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -46,6 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (token && userStr) {
           const userData = JSON.parse(userStr);
+
+          // Migrate existing user data to new role format if needed
+          if (userData.role && typeof userData.role === 'string') {
+            const mappedRole = mapBackendRoleToFrontend(userData.role);
+            userData.role = mappedRole;
+
+            if (userData.roles && Array.isArray(userData.roles)) {
+              userData.roles = userData.roles.map((role: string) => mapBackendRoleToFrontend(role));
+            }
+
+            // Update stored user data with migrated roles
+            Cookies.set('user', JSON.stringify(userData), { expires: 7 });
+          }
+
           setUser(userData);
         }
       } catch (error) {
@@ -63,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      
+
       const response = await apiClient.post('/auth/login', {
         email,
         password,
@@ -76,6 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Cookies.set('access_token', access_token, { expires: 7 });
 
         // Transform backend user to frontend format
+        const primaryRole = backendUser.roles?.[0] || backendUser.usergroup_id;
+        const mappedRole = mapBackendRoleToFrontend(primaryRole);
+
         const user: User = {
           _id: backendUser.id,
           id: backendUser.id,
@@ -83,10 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: backendUser.name,
           first_name: backendUser.name?.split(' ')[0] || '',
           last_name: backendUser.name?.split(' ').slice(1).join(' ') || '',
-          role: backendUser.roles?.[0] || backendUser.usergroup_id,
-          roles: backendUser.roles || [backendUser.usergroup_id],
+          role: mappedRole as any,
+          roles: (backendUser.roles || [backendUser.usergroup_id]).map(mapBackendRoleToFrontend),
           school_id: backendUser.school_id,
           usergroup_id: backendUser.usergroup_id,
+          ref_id: backendUser.ref_id || backendUser.id,
         };
 
         // Store user data
@@ -110,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (data: any) => {
     try {
       setIsLoading(true);
-      
+
       const response = await apiClient.post('/auth/register', data);
 
       if (response.data.success && response.data.data) {
@@ -120,6 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Cookies.set('access_token', access_token, { expires: 7 });
 
         // Transform backend user to frontend format
+        const primaryRole = backendUser.roles?.[0] || backendUser.usergroup_id;
+        const mappedRole = mapBackendRoleToFrontend(primaryRole);
+
         const user: User = {
           _id: backendUser.id,
           id: backendUser.id,
@@ -127,10 +166,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: backendUser.name,
           first_name: backendUser.name?.split(' ')[0] || '',
           last_name: backendUser.name?.split(' ').slice(1).join(' ') || '',
-          role: backendUser.roles?.[0] || backendUser.usergroup_id,
-          roles: backendUser.roles || [backendUser.usergroup_id],
+          role: mappedRole as any,
+          roles: (backendUser.roles || [backendUser.usergroup_id]).map(mapBackendRoleToFrontend),
           school_id: backendUser.school_id,
           usergroup_id: backendUser.usergroup_id,
+          ref_id: backendUser.ref_id || backendUser.id,
         };
 
         // Store user data
@@ -159,16 +199,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
 
-  const updateUser = (updatedUser: User) => {
+  const updateUser = (updatedFields: Partial<User>) => {
+    if (!user) return;
+    
+    const updatedUser = { ...user, ...updatedFields };
     setUser(updatedUser);
     Cookies.set('user', JSON.stringify(updatedUser), { expires: 7 });
   };
 
   const hasRole = (roles: string | string[]): boolean => {
     if (!user) return false;
-    
+
     const rolesToCheck = Array.isArray(roles) ? roles : [roles];
-    return rolesToCheck.some(role => 
+    return rolesToCheck.some(role =>
       user.roles?.includes(role) || user.role === role
     );
   };

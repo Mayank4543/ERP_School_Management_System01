@@ -89,10 +89,10 @@ async function bootstrap() {
   const port = configService.get('PORT') || 8080;
   await app.listen(port);
 
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📡 API endpoint: http://localhost:${port}/${apiPrefix}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
-  console.log(`🗄️  MongoDB: ${configService.get('MONGODB_URI') ? 'Ready (configure URI in .env)' : 'Not configured'}`);
+  console.log(` Application is running on: http://localhost:${port}`);
+  console.log(` API endpoint: http://localhost:${port}/${apiPrefix}`);
+  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  console.log(` MongoDB: ${configService.get('MONGODB_URI') ? 'Ready (configure URI in .env)' : 'Not configured'}`);
 }
 
 bootstrap();

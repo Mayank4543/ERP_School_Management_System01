@@ -19,6 +19,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.935.0",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^11.1.8",
@@ -41,6 +42,7 @@
     "handlebars": "^4.7.8",
     "ioredis": "^5.8.2",
     "mongoose": "^8.19.3",
+    "multer": "^1.4.5-lts.1",
     "nest-winston": "^1.10.2",
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
@@ -63,6 +65,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^1.4.13",
     "@types/node": "^24.10.0",
     "@types/nodemailer": "^7.0.3",
     "@types/passport-jwt": "^4.0.1",

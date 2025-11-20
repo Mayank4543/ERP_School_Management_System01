@@ -32,6 +32,12 @@ export class User {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ trim: true })
+  first_name: string;
+
+  @Prop({ trim: true })
+  last_name: string;
+
   @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
   email: string;
 
@@ -62,6 +68,9 @@ export class User {
 
   @Prop({ type: [String], default: [] })
   permissions: string[];
+
+  @Prop()
+  profile_picture: string;
 
   @Prop({ type: Date })
   deleted_at: Date;

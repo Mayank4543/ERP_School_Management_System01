@@ -33,6 +33,14 @@ apiClient.interceptors.request.use(
       }
     }
 
+    // Debug logging for student creation
+    if (config.method === 'post' && config.url?.includes('students')) {
+      console.log('📤 Student Creation Request:');
+      console.log('URL:', `${config.baseURL}${config.url}`);
+      console.log('Headers:', config.headers);
+      console.log('Data:', config.data);
+    }
+
     return config;
   },
   (error) => {
@@ -46,6 +54,14 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Debug logging for student creation errors
+    if (error.config?.method === 'post' && error.config?.url?.includes('students')) {
+      console.log('❌ Student Creation Error:');
+      console.log('Status:', error.response?.status);
+      console.log('Data:', error.response?.data);
+      console.log('Request data:', error.config?.data);
+    }
+
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
@@ -54,7 +70,7 @@ apiClient.interceptors.response.use(
         // Unauthorized - clear auth and redirect to login
         Cookies.remove('access_token');
         Cookies.remove('user');
-        
+
         if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }

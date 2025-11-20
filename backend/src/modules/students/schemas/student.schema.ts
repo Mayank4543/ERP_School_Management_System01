@@ -5,13 +5,13 @@ export type StudentDocument = Student & Document;
 
 @Schema({ timestamps: true, collection: 'student_academics' })
 export class Student {
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true, index: true, ref: 'User' })
   user_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true, index: true, ref: 'School' })
   school_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, required: true, index: true })
+  @Prop({ type: Types.ObjectId, required: true, index: true, ref: 'AcademicYear' })
   academic_year_id: Types.ObjectId;
 
   @Prop({ type: Number, required: true })
@@ -56,11 +56,23 @@ export class Student {
   @Prop({ type: String })
   transport_mode: string;
 
-  @Prop({ type: Types.ObjectId })
+  @Prop({ type: Types.ObjectId, ref: 'Route' })
   route_id: Types.ObjectId;
 
-  @Prop([{ type: Types.ObjectId }])
+  @Prop([{ type: Types.ObjectId, ref: 'User' }])
   parent_ids: Types.ObjectId[];
+
+  @Prop({ type: String })
+  father_name: string;
+
+  @Prop({ type: String })
+  mother_name: string;
+
+  @Prop({ type: String })
+  parent_contact: string;
+
+  @Prop({ type: String })
+  parent_email: string;
 
   @Prop({ type: Object })
   medical_info: {

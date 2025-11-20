@@ -43,12 +43,14 @@ export class TeachersController {
   @ApiOperation({ summary: 'Get all teachers' })
   @ApiQuery({ name: 'department', required: false })
   @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAll(
     @CurrentUser() user: any,
     @Query('department') department?: string,
     @Query('status') status?: string,
+    @Query('search') search?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
@@ -56,6 +58,7 @@ export class TeachersController {
       user.schoolId,
       department,
       status,
+      search,
       page ? Number(page) : 1,
       limit ? Number(limit) : 20,
     );
@@ -63,12 +66,9 @@ export class TeachersController {
     return {
       success: true,
       data: result.data,
-      meta: {
-        page: result.page,
-        limit: limit ? Number(limit) : 20,
-        total: result.total,
-        totalPages: result.totalPages,
-      },
+      page: result.page,
+      total: result.total,
+      totalPages: result.totalPages,
     };
   }
 

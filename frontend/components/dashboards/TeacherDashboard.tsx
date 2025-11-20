@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -11,19 +12,74 @@ import {
   AlertCircle,
   TrendingUp,
   ClipboardList,
-  Award
+  Award,
+  Loader2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { dashboardService, type TeacherDashboardData } from '@/lib/api/services/dashboard.service';
+import { toast } from 'sonner';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user?.ref_id]);
+
+  const fetchDashboardData = async () => {
+    // user.ref_id contains the teacher _id for teacher users
+    if (!user?.ref_id) return;
+
+    try {
+      setLoading(true);
+      const data = await dashboardService.getTeacherDashboard(user.ref_id);
+      setDashboardData(data);
+    } catch (error: any) {
+      console.error('Failed to fetch teacher dashboard:', error);
+      toast.error(error.response?.data?.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (!dashboardData) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">Failed to load dashboard data</p>
+          <button
+            onClick={fetchDashboardData}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Personal Stats
   const teacherStats = [
     {
       title: 'My Classes',
-      value: '5',
-      change: '3 sections',
+      value: dashboardData.stats.my_classes.toString(),
+      change: `${dashboardData.teacher_info.subjects.length} subjects`,
       trend: 'neutral',
       icon: BookOpen,
       color: 'blue',
@@ -31,7 +87,7 @@ export default function TeacherDashboard() {
     },
     {
       title: 'Total Students',
-      value: '150',
+      value: dashboardData.stats.total_students.toString(),
       change: 'Under supervision',
       trend: 'neutral',
       icon: Users,
@@ -40,8 +96,8 @@ export default function TeacherDashboard() {
     },
     {
       title: 'Today\'s Classes',
-      value: '4',
-      change: '6 hours',
+      value: dashboardData.stats.today_classes.toString(),
+      change: `${dashboardData.stats.today_classes * 1} hours`,
       trend: 'neutral',
       icon: Clock,
       color: 'purple',
@@ -49,8 +105,8 @@ export default function TeacherDashboard() {
     },
     {
       title: 'Pending Grading',
-      value: '28',
-      change: '3 subjects',
+      value: dashboardData.stats.pending_grading.toString(),
+      change: `${dashboardData.teacher_info.subjects.length} subjects`,
       trend: 'down',
       icon: FileCheck,
       color: 'orange',
@@ -58,35 +114,13 @@ export default function TeacherDashboard() {
     },
   ];
 
-  // Today's Teaching Schedule
-  const todaySchedule = [
-    { time: '09:00 - 10:00', class: '10-A', subject: 'Mathematics', room: '101', students: 40, status: 'completed' },
-    { time: '10:00 - 11:00', class: '10-B', subject: 'Mathematics', room: '102', students: 38, status: 'completed' },
-    { time: '11:15 - 12:15', class: '11-A', subject: 'Advanced Math', room: '201', students: 35, status: 'ongoing' },
-    { time: '02:00 - 03:00', class: '9-A', subject: 'Mathematics', room: '103', students: 42, status: 'upcoming' },
-  ];
-
-  // Upcoming Exams (to conduct)
-  const upcomingExams = [
-    { class: '10-A', subject: 'Mathematics', date: '2025-11-25', type: 'Mid-term', duration: '3 hours', totalMarks: 100 },
-    { class: '11-A', subject: 'Advanced Math', date: '2025-11-28', type: 'Mid-term', duration: '3 hours', totalMarks: 100 },
-    { class: '9-A', subject: 'Mathematics', date: '2025-12-02', type: 'Unit Test', duration: '1 hour', totalMarks: 50 },
-  ];
-
-  // Pending Grading Tasks
-  const pendingGrading = [
-    { class: '10-A', task: 'Algebra Test Papers', count: 12, subject: 'Mathematics', dueDate: '2025-11-20', priority: 'high' },
-    { class: '10-B', task: 'Geometry Assignment', count: 8, subject: 'Mathematics', dueDate: '2025-11-22', priority: 'medium' },
-    { class: '11-A', task: 'Calculus Quiz', count: 8, subject: 'Advanced Math', dueDate: '2025-11-24', priority: 'low' },
-  ];
-
-  // Class-wise Attendance Overview (Today)
-  const attendanceOverview = [
-    { class: '10-A', total: 40, present: 37, absent: 3, percentage: 92.5, status: 'good' },
-    { class: '10-B', total: 38, present: 35, absent: 3, percentage: 92.1, status: 'good' },
-    { class: '11-A', total: 35, present: 30, absent: 5, percentage: 85.7, status: 'average' },
-    { class: '9-A', total: 42, present: 40, absent: 2, percentage: 95.2, status: 'excellent' },
-  ];
+  // Today's attendance from backend
+  const attendanceStats = {
+    percentage: dashboardData.today_attendance.percentage,
+    present: dashboardData.today_attendance.present,
+    absent: dashboardData.today_attendance.absent,
+    total: dashboardData.today_attendance.total,
+  };
 
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
@@ -95,28 +129,24 @@ export default function TeacherDashboard() {
     orange: 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300',
   };
 
-  const statusColors = {
-    completed: 'bg-green-100 text-green-700 border-green-200',
-    ongoing: 'bg-blue-100 text-blue-700 border-blue-200',
-    upcoming: 'bg-gray-100 text-gray-700 border-gray-200',
-  };
-
-  const attendanceStatusColors = {
-    excellent: 'bg-green-100 text-green-700',
-    good: 'bg-blue-100 text-blue-700',
-    average: 'bg-yellow-100 text-yellow-700',
-    poor: 'bg-red-100 text-red-700',
-  };
+  const attendanceStatusColor = 
+    attendanceStats.percentage >= 95 ? 'bg-green-100 text-green-700' :
+    attendanceStats.percentage >= 90 ? 'bg-blue-100 text-blue-700' :
+    attendanceStats.percentage >= 80 ? 'bg-yellow-100 text-yellow-700' :
+    'bg-red-100 text-red-700';
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-lg p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.first_name}! 👨‍🏫
+          Welcome back, {dashboardData.teacher_info.name}! 👨‍🏫
         </h1>
         <p className="text-green-100">
-          Here's your teaching schedule and pending tasks for today
+          Employee ID: {dashboardData.teacher_info.employee_id} • {dashboardData.teacher_info.email}
+        </p>
+        <p className="text-green-100 text-sm mt-1">
+          Subjects: {dashboardData.teacher_info.subjects.join(', ') || 'Not assigned'}
         </p>
       </div>
 
@@ -152,94 +182,57 @@ export default function TeacherDashboard() {
         })}
       </div>
 
-      {/* Two Column Layout */}
+      {/* Attendance & Exams Row */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Today's Teaching Schedule */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock size={20} />
-              My Classes Today
-            </CardTitle>
-            <CardDescription>Monday, November 17, 2025</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {todaySchedule.map((classItem, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  <div className="flex-shrink-0">
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{classItem.time.split(' - ')[0]}</div>
-                    <div className="text-xs text-gray-500">{classItem.time.split(' - ')[1]}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold">Class {classItem.class} - {classItem.subject}</p>
-                      <Badge variant="outline" className={`text-xs ${statusColors[classItem.status as keyof typeof statusColors]}`}>
-                        {classItem.status}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-500">Room {classItem.room} • {classItem.students} students</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Attendance Overview */}
+        {/* Today's Attendance Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar size={20} />
-              Today's Attendance
+              Today's Attendance Summary
             </CardTitle>
-            <CardDescription>Class-wise attendance overview</CardDescription>
+            <CardDescription>Overall attendance marked today</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {attendanceOverview.map((attendance, index) => (
-                <div key={index} className="p-3 rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-semibold">Class {attendance.class}</p>
-                    <Badge 
-                      variant="secondary" 
-                      className={`text-xs ${attendanceStatusColors[attendance.status as keyof typeof attendanceStatusColors]}`}
-                    >
-                      {attendance.percentage.toFixed(1)}%
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      Present: {attendance.present}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      Absent: {attendance.absent}
-                    </span>
-                    <span className="text-gray-500">Total: {attendance.total}</span>
-                  </div>
-                  {/* Progress Bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        attendance.percentage >= 95 ? 'bg-green-500' :
-                        attendance.percentage >= 90 ? 'bg-blue-500' :
-                        attendance.percentage >= 80 ? 'bg-yellow-500' :
-                        'bg-red-500'
-                      }`}
-                      style={{ width: `${attendance.percentage}%` }}
-                    ></div>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-bold">{attendanceStats.percentage.toFixed(1)}%</span>
+                <Badge variant="secondary" className={`text-sm ${attendanceStatusColor}`}>
+                  {attendanceStats.percentage >= 90 ? 'Excellent' : attendanceStats.percentage >= 80 ? 'Good' : 'Average'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{attendanceStats.total}</div>
+                  <div className="text-xs text-gray-500">Total</div>
                 </div>
-              ))}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{attendanceStats.present}</div>
+                  <div className="text-xs text-gray-500">Present</div>
+                </div>
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600">{attendanceStats.absent}</div>
+                  <div className="text-xs text-gray-500">Absent</div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className={`h-3 rounded-full transition-all ${
+                    attendanceStats.percentage >= 95 ? 'bg-green-500' :
+                    attendanceStats.percentage >= 90 ? 'bg-blue-500' :
+                    attendanceStats.percentage >= 80 ? 'bg-yellow-500' :
+                    'bg-red-500'
+                  }`}
+                  style={{ width: `${attendanceStats.percentage}%` }}
+                ></div>
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Two Column Layout - Exams & Grading */}
-      <div className="grid gap-4 md:grid-cols-2">
         {/* Upcoming Exams */}
         <Card>
           <CardHeader>
@@ -251,72 +244,58 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {upcomingExams.map((exam, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold">Class {exam.class} - {exam.subject}</p>
-                      <Badge variant="secondary" className="text-xs">{exam.totalMarks} Marks</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        {new Date(exam.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {exam.duration}
-                      </span>
-                      <Badge variant="outline" className="text-xs">{exam.type}</Badge>
+              {dashboardData.upcoming_exams.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <ClipboardList size={48} className="mx-auto mb-2 opacity-50" />
+                  <p>No upcoming exams scheduled</p>
+                </div>
+              ) : (
+                dashboardData.upcoming_exams.map((exam, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold">{exam.name}</p>
+                        <Badge variant="secondary" className="text-xs capitalize">{exam.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} />
+                          {new Date(exam.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <Badge variant="outline" className="text-xs capitalize">{exam.exam_type}</Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Grading */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award size={20} />
-              Pending Grading
-            </CardTitle>
-            <CardDescription>Papers to evaluate</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pendingGrading.map((grading, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold">Class {grading.class}</p>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs ${
-                          grading.priority === 'high' ? 'border-red-500 text-red-500' :
-                          grading.priority === 'medium' ? 'border-yellow-500 text-yellow-500' :
-                          'border-green-500 text-green-500'
-                        }`}
-                      >
-                        {grading.priority}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{grading.task} • {grading.subject}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{grading.count} papers</span>
-                      <span className="text-xs text-gray-500">
-                        Due: {new Date(grading.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Activities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award size={20} />
+            Recent Activities
+          </CardTitle>
+          <CardDescription>Your recent teaching activities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {dashboardData.recent_activities.map((activity, index) => (
+              <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">{activity.action}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">{activity.details}</p>
+                  <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
