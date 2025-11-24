@@ -128,6 +128,11 @@ export class CreateStudentDto {
   @IsString()
   parent_email?: string;
 
+  @ApiPropertyOptional({ description: 'Student Status', example: 'active', enum: ['active', 'inactive', 'transferred', 'graduated'] })
+  @IsOptional()
+  @IsEnum(['active', 'inactive', 'transferred', 'graduated'])
+  status?: string;
+
   @ApiPropertyOptional({
     description: 'Medical Information',
     type: 'object',

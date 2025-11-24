@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DataTable, Column } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileImage from '@/components/shared/ProfileImage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +23,7 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchInput, setSearchInput] = useState(''); // Local search input state
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -30,10 +32,27 @@ export default function TeachersPage() {
   });
   const [filters, setFilters] = useState({
     search: '',
-    department: '',
-    designation: '',
-    status: 'active' as 'active' | 'inactive' | '',
+    department: 'all',
+    designation: 'all',
+    status: 'all' as 'active' | 'inactive' | 'all', // Start with no filter to show all teachers
   });
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchInput !== filters.search) {
+        updateFilters({ ...filters, search: searchInput });
+      }
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  // Reset pagination when filters change
+  const updateFilters = useCallback((newFilters: typeof filters) => {
+    setFilters(newFilters);
+    setPagination(prev => ({ ...prev, page: 1 })); // Reset to page 1 when filters change
+  }, []);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -42,39 +61,64 @@ export default function TeachersPage() {
   });
 
   useEffect(() => {
-    fetchTeachers();
-  }, [pagination.page, pagination.limit, filters]);
+    console.log('useEffect triggered - user:', user, 'filters:', filters);
+    if (user?.school_id) {
+      fetchTeachers();
+    }
+  }, [user?.school_id, pagination.page, pagination.limit, filters]);
 
   const fetchTeachers = async () => {
     try {
       setLoading(true);
+
+      if (!user?.school_id) {
+        toast.error('School information not available. Please refresh and try again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching teachers with params:', {
+        schoolId: user.school_id,
+        page: pagination.page,
+        limit: pagination.limit,
+        filters
+      });
+
       const response = await teachersService.getAll({
-        schoolId: user?.school_id || '',
+        schoolId: user.school_id,
         page: pagination.page,
         limit: pagination.limit,
         search: filters.search || undefined,
-        department: filters.department || undefined,
-        status: filters.status || undefined,
+        department: filters.department === 'all' ? undefined : filters.department,
+        designation: filters.designation === 'all' ? undefined : filters.designation,
+        status: filters.status === 'all' ? undefined : filters.status,
       });
 
-      if (response.success) {
-        setTeachers(response.data);
+      console.log('Teachers API response:', response);
+
+      if (response && response.data) {
+        setTeachers(response.data || []);
         setPagination({
-          page: response.page,
+          page: response.page || pagination.page,
           limit: pagination.limit,
-          total: response.total,
-          totalPages: response.totalPages,
+          total: response.total || 0,
+          totalPages: response.totalPages || 0,
         });
 
         // Update stats
         setStats({
-          total: response.total,
-          active: response.data.filter(t => t.is_active).length,
-          departments: [...new Set(response.data.map(t => t.department).filter(Boolean))].length,
+          total: response.total || 0,
+          active: (response.data || []).filter(t => t.is_active).length,
+          departments: [...new Set((response.data || []).map(t => t.department).filter(Boolean))].length,
         });
+      } else {
+        setTeachers([]);
+        toast.error('No teachers data received from server');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to fetch teachers');
+      console.error('Error fetching teachers:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to fetch teachers');
+      setTeachers([]);
     } finally {
       setLoading(false);
     }
@@ -96,7 +140,10 @@ export default function TeachersPage() {
     try {
       const blob = await teachersService.exportToExcel({
         schoolId: user?.school_id || '',
-        ...filters,
+        search: filters.search,
+        department: filters.department === 'all' ? undefined : filters.department,
+        designation: filters.designation === 'all' ? undefined : filters.designation,
+        status: filters.status === 'all' ? undefined : filters.status as 'active' | 'inactive',
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -113,11 +160,12 @@ export default function TeachersPage() {
   };
 
   const clearFilters = () => {
-    setFilters({
+    setSearchInput('');
+    updateFilters({
       search: '',
-      department: '',
-      designation: '',
-      status: 'active',
+      department: 'all',
+      designation: 'all',
+      status: 'all',
     });
   };
 
@@ -134,12 +182,12 @@ export default function TeachersPage() {
       key: 'profile_picture',
       label: 'Photo',
       render: (_, teacher) => (
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={teacher.profile_picture} />
-          <AvatarFallback className="bg-blue-500 text-white">
-            {teacher.first_name[0]}{teacher.last_name[0]}
-          </AvatarFallback>
-        </Avatar>
+        <ProfileImage
+          src={teacher.profile_picture}
+          alt={`${teacher.first_name} ${teacher.last_name}`}
+          fallbackText={`${teacher.first_name} ${teacher.last_name}`}
+          size="md"
+        />
       ),
     },
     {
@@ -187,7 +235,7 @@ export default function TeachersPage() {
       render: (subjects) => (
         <div className="space-y-1">
           {subjects && subjects.length > 0 ? (
-            subjects.slice(0, 2).map((subject, idx) => (
+            subjects.slice(0, 2).map((subject: string, idx: number) => (
               <Badge key={idx} variant="outline" className="text-xs">
                 {subject}
               </Badge>
@@ -341,11 +389,19 @@ export default function TeachersPage() {
               <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Search by name, employee ID, email, phone..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10"
               />
             </div>
+            {/* Active Filters Indicator */}
+            {(filters.search || (filters.department !== 'all') || (filters.designation !== 'all') || (filters.status !== 'all')) && (
+              <div className="text-sm text-blue-600 font-medium">
+                {[filters.search && 'Search', (filters.department !== 'all') && 'Department', (filters.designation !== 'all') && 'Designation', (filters.status !== 'all') && 'Status']
+                  .filter(Boolean).length} filter{[filters.search && 'Search', (filters.department !== 'all') && 'Department', (filters.designation !== 'all') && 'Designation', (filters.status !== 'all') && 'Status']
+                    .filter(Boolean).length > 1 ? 's' : ''} active
+              </div>
+            )}
           </div>
 
           {/* Advanced Filters */}
@@ -353,49 +409,66 @@ export default function TeachersPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
               <div className="space-y-2">
                 <Label htmlFor="department">Department</Label>
-                <Select value={filters.department} onValueChange={(value) => setFilters({ ...filters, department: value })}>
+                <Select value={filters.department} onValueChange={(value) => updateFilters({ ...filters, department: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Departments</SelectItem>
-                    <SelectItem value="Science">Science</SelectItem>
+                    <SelectItem value="all">All Departments</SelectItem>
                     <SelectItem value="Mathematics">Mathematics</SelectItem>
+                    <SelectItem value="Science">Science</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
+                    <SelectItem value="Chemistry">Chemistry</SelectItem>
+                    <SelectItem value="Biology">Biology</SelectItem>
                     <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Hindi">Hindi</SelectItem>
                     <SelectItem value="Social Studies">Social Studies</SelectItem>
+                    <SelectItem value="History">History</SelectItem>
+                    <SelectItem value="Geography">Geography</SelectItem>
                     <SelectItem value="Computer Science">Computer Science</SelectItem>
                     <SelectItem value="Physical Education">Physical Education</SelectItem>
+                    <SelectItem value="Arts">Arts</SelectItem>
+                    <SelectItem value="Music">Music</SelectItem>
+                    <SelectItem value="Sanskrit">Sanskrit</SelectItem>
+                    <SelectItem value="Administration">Administration</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="designation">Designation</Label>
-                <Select value={filters.designation} onValueChange={(value) => setFilters({ ...filters, designation: value })}>
+                <Select value={filters.designation} onValueChange={(value) => updateFilters({ ...filters, designation: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Designations" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Designations</SelectItem>
+                    <SelectItem value="all">All Designations</SelectItem>
                     <SelectItem value="Principal">Principal</SelectItem>
                     <SelectItem value="Vice Principal">Vice Principal</SelectItem>
+                    <SelectItem value="Head Teacher">Head Teacher</SelectItem>
                     <SelectItem value="Senior Teacher">Senior Teacher</SelectItem>
                     <SelectItem value="Junior Teacher">Junior Teacher</SelectItem>
-                    <SelectItem value="PGT">PGT</SelectItem>
-                    <SelectItem value="TGT">TGT</SelectItem>
-                    <SelectItem value="PRT">PRT</SelectItem>
+                    <SelectItem value="PGT">PGT (Post Graduate Teacher)</SelectItem>
+                    <SelectItem value="TGT">TGT (Trained Graduate Teacher)</SelectItem>
+                    <SelectItem value="PRT">PRT (Primary Teacher)</SelectItem>
+                    <SelectItem value="Subject Coordinator">Subject Coordinator</SelectItem>
+                    <SelectItem value="Department Head">Department Head</SelectItem>
+                    <SelectItem value="Guest Teacher">Guest Teacher</SelectItem>
+                    <SelectItem value="Lab Assistant">Lab Assistant</SelectItem>
+                    <SelectItem value="Librarian">Librarian</SelectItem>
+                    <SelectItem value="Sports Teacher">Sports Teacher</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value as any })}>
+                <Select value={filters.status} onValueChange={(value) => updateFilters({ ...filters, status: value as any })}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
@@ -411,6 +484,14 @@ export default function TeachersPage() {
             </div>
           )}
 
+
+
+          {loading && (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-gray-500">Loading teachers...</div>
+            </div>
+          )}
+
           {/* Data Table */}
           <DataTable
             columns={columns}
@@ -419,7 +500,7 @@ export default function TeachersPage() {
             pagination={pagination}
             onPageChange={(page) => setPagination({ ...pagination, page })}
             onLimitChange={(limit) => setPagination({ ...pagination, limit, page: 1 })}
-            emptyMessage="No teachers found. Add your first teacher to get started."
+            emptyMessage={`No teachers found${teachers.length === 0 && !loading ? '. Click "Add Teacher" to create your first teacher.' : '.'}`}
             showSearch={false}
             showExport={false}
           />

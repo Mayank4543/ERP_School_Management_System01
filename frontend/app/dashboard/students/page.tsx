@@ -26,6 +26,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -36,19 +37,60 @@ export default function StudentsPage() {
     search: '',
     standard: undefined as number | undefined,
     section: undefined as string | undefined,
+    status: undefined as string | undefined,
   });
 
   useEffect(() => {
     fetchStudents();
-    loadSections();
   }, [pagination.page, pagination.limit, filters]);
+
+  useEffect(() => {
+    // Load sections independently, only once
+    loadSections();
+  }, []);
 
   const loadSections = async () => {
     try {
-      const allSections = await sectionsService.getAll();
-      setSections(allSections);
+      setSectionsLoading(true);
+
+      if (!user?.school_id) {
+        console.warn('No school_id found for sections loading');
+        setSections([]);
+        setSectionsLoading(false);
+        return;
+      }
+
+      const response = await sectionsService.getAll({
+        schoolId: user.school_id,
+        page: 1,
+        limit: 1000
+      });
+
+      console.log('🔍 Sections API response:', response);
+
+      // Handle both paginated response and direct array response
+      let sectionsArray: any[] = [];
+
+      if (Array.isArray(response)) {
+        sectionsArray = response;
+      } else if (response && Array.isArray(response.data)) {
+        sectionsArray = response.data;
+      } else if (response && typeof response === 'object' && 'data' in response) {
+        // Handle case where data might not be an array but exists
+        sectionsArray = Array.isArray(response.data) ? response.data : [];
+      } else {
+        console.warn('⚠️ Unexpected sections response format:', response);
+        sectionsArray = [];
+      }
+
+      setSections(sectionsArray);
+      console.log('✅ Loaded sections:', sectionsArray.length, 'sections');
     } catch (error) {
-      console.warn('Failed to load sections:', error);
+      console.error('❌ Failed to load sections:', error);
+      setSections([]); // Ensure sections is always an array
+      toast.error('Failed to load sections data');
+    } finally {
+      setSectionsLoading(false);
     }
   };
 
@@ -78,12 +120,14 @@ export default function StudentsPage() {
         search: filters.search || undefined,
         standard: filters.standard,
         section: filters.section,
+        status: filters.status,
       });
 
       console.log('✅ Students API Response:', response);
       console.log('📊 Sample student raw data:', response.data[0]);
 
       if (response.success) {
+        console.log('✅ Students loaded with complete data from backend');
         setStudents(response.data);
         setPagination({
           page: response.page,
@@ -93,14 +137,14 @@ export default function StudentsPage() {
         });
 
         console.log(`✅ Loaded ${response.data.length} students (Total: ${response.total})`);
-        
+
         // Debug the first student's data structure
         if (response.data.length > 0) {
           const student = response.data[0];
           console.log('🔍 First student analysis:', {
             user_id_type: typeof student.user_id,
             user_id_value: student.user_id,
-            section_id_type: typeof student.section_id, 
+            section_id_type: typeof student.section_id,
             section_id_value: student.section_id,
             admission_no: student.admission_no,
             roll_no: student.roll_no
@@ -125,6 +169,21 @@ export default function StudentsPage() {
       fetchStudents();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete student');
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const action = newStatus === 'active' ? 'activate' : 'deactivate';
+
+    if (!confirm(`Are you sure you want to ${action} this student?`)) return;
+
+    try {
+      await studentsService.update(id, { status: newStatus });
+      toast.success(`Student ${action}d successfully`);
+      fetchStudents();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || `Failed to ${action} student`);
     }
   };
 
@@ -156,23 +215,36 @@ export default function StudentsPage() {
       label: 'Photo',
       render: (_, student: any) => {
         let initials = 'ST';
-        
-        if (typeof student.user_id === 'object' && student.user_id?.name) {
-          const userName = student.user_id.name;
-          initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase();
+        let profilePicture = null;
+        let userName = 'Student';
+
+        if (typeof student.user_id === 'object' && student.user_id) {
+          const firstName = student.user_id.first_name || '';
+          const lastName = student.user_id.last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+
+          // Fallback to email username if name is not available
+          userName = fullName || student.user_id.name ||
+            (student.user_id.email ? student.user_id.email.split('@')[0] : 'Student');
+          profilePicture = student.user_id.profile_picture;
+
+          if (userName && userName !== 'Student') {
+            initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+          } else {
+            // Use admission number as fallback
+            initials = student.admission_no ? student.admission_no.slice(-2).toUpperCase() : 'ST';
+          }
         } else {
           // Use admission number as fallback
-          initials = student.admission_no ? student.admission_no.slice(-2) : 'ST';
+          initials = student.admission_no ? student.admission_no.slice(-2).toUpperCase() : 'ST';
+          userName = student.admission_no || 'Student';
         }
-        
-        const profilePicture = typeof student.user_id === 'object' ? student.user_id?.profile_picture : student.profile_picture;
-        const userName = typeof student.user_id === 'object' ? student.user_id?.name : 'Student';
-        
+
         return (
           <ProfileImage
             src={profilePicture}
             alt={userName}
-            fallbackText={userName}
+            fallbackText={initials}
             size="md"
           />
         );
@@ -191,10 +263,15 @@ export default function StudentsPage() {
         // Handle both populated and non-populated user_id
         let userName = 'N/A';
         let userEmail = 'N/A';
-        
+
         if (typeof student.user_id === 'object' && student.user_id) {
           // User is populated
-          userName = student.user_id.name || 'N/A';
+          const firstName = student.user_id.first_name || '';
+          const lastName = student.user_id.last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+
+          userName = fullName || student.user_id.name ||
+            (student.user_id.email ? student.user_id.email.split('@')[0] : 'N/A');
           userEmail = student.user_id.email || 'N/A';
         } else if (typeof student.user_id === 'string') {
           // User is just an ID - show ID as fallback
@@ -222,8 +299,23 @@ export default function StudentsPage() {
       label: 'Class',
       render: (_, student: any) => {
         // Get section name from loaded sections since section_id might be a string
-        const section = sections.find(s => s._id === student.section_id);
-        const sectionName = section?.name || 'Unknown';
+        // Ensure sections is an array before calling find
+        const sectionsArray = Array.isArray(sections) ? sections : [];
+
+        if (sectionsLoading && sectionsArray.length === 0) {
+          return (
+            <span>
+              Class {student.standard} - Loading...
+            </span>
+          );
+        }
+
+        const section = sectionsArray.find(s => s._id === student.section_id);
+        // Try multiple fallback strategies for section name
+        const sectionName = section?.name ||
+          student.section ||
+          student.section_name ||
+          (student.section_id ? `Section ${student.section_id.slice(-3)}` : 'Unknown');
 
         return (
           <span>
@@ -237,24 +329,29 @@ export default function StudentsPage() {
       label: 'Mobile No',
       render: (_, student: any) => {
         let mobileNo = 'N/A';
-        
+
         if (typeof student.user_id === 'object' && student.user_id?.mobile_no) {
           mobileNo = student.user_id.mobile_no;
         } else if (typeof student.user_id === 'string') {
           mobileNo = 'Click to view';
         }
-        
+
         return mobileNo;
       },
     },
     {
       key: 'status',
       label: 'Status',
-      render: (value: string) => (
-        <Badge variant={value === 'active' ? 'default' : 'secondary'}>
-          {value || 'Active'}
-        </Badge>
-      ),
+      render: (_, student: any) => {
+        const status = student.status || 'active';
+        const variant = status === 'active' ? 'default' :
+          status === 'inactive' ? 'destructive' : 'secondary';
+        return (
+          <Badge variant={variant}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Badge>
+        );
+      },
     },
     {
       key: '_id',
@@ -274,6 +371,26 @@ export default function StudentsPage() {
             <DropdownMenuItem onClick={() => router.push(`/dashboard/students/${student._id}/edit`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleToggleStatus(student._id, student.status || 'active')}
+              className={student.status === 'active' ? 'text-orange-600' : 'text-green-600'}
+            >
+              {student.status === 'active' ? (
+                <>
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Activate
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-red-600"
@@ -302,6 +419,69 @@ export default function StudentsPage() {
       </div>
 
       <Card className="p-6">
+        {/* Filters Section */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-medium mb-3">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Status Filter */}
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Status</label>
+              <select
+                value={filters.status || ''}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+                className="w-full text-sm border rounded px-3 py-2"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="transferred">Transferred</option>
+                <option value="graduated">Graduated</option>
+              </select>
+            </div>
+
+            {/* Class Filter */}
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Class</label>
+              <select
+                value={filters.standard || ''}
+                onChange={(e) => setFilters({ ...filters, standard: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full text-sm border rounded px-3 py-2"
+              >
+                <option value="">All Classes</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(std => (
+                  <option key={std} value={std}>Class {std}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Section Filter */}
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Section</label>
+              <select
+                value={filters.section || ''}
+                onChange={(e) => setFilters({ ...filters, section: e.target.value || undefined })}
+                className="w-full text-sm border rounded px-3 py-2"
+                disabled={sectionsLoading}
+              >
+                <option value="">All Sections</option>
+                {sections.map(section => (
+                  <option key={section._id} value={section.name}>{section.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Clear Filters */}
+            <div className="flex items-end">
+              <button
+                onClick={() => setFilters({ search: '', standard: undefined, section: undefined, status: undefined })}
+                className="w-full text-sm bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </div>
+
         <DataTable
           columns={columns}
           data={students}

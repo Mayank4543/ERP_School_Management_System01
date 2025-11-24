@@ -14,7 +14,8 @@ import studentsService from '@/lib/api/services/students.service';
 import usersService from '@/lib/api/services/users.service';
 import apiClient from '@/lib/api/client';
 import academicService from '@/lib/api/services/academic.service';
-import sectionsService, { type Section } from '@/lib/api/services/sections.service';
+import sectionsService from '@/lib/api/services/sections.service';
+import { type Section } from '@/types/academic';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateStudentData {
@@ -99,49 +100,103 @@ export default function CreateStudentPage() {
 
   const loadInitialData = async () => {
     try {
-      // Load current academic year from API (fallback to mock if API fails)
-      try {
-        const academicYear = await academicService.getCurrent();
-        if (academicYear && academicYear._id) {
-          setCurrentAcademicYear(academicYear);
-          console.log('✅ Loaded academic year from API:', academicYear);
-        } else {
-          throw new Error('No current academic year found');
-        }
-      } catch (apiError) {
-        console.log('⚠️ Academic year API failed, using mock data:', apiError);
-        // Create mock academic year data since API failed
-        setCurrentAcademicYear({
-          _id: '507f1f77bcf86cd799439012', // Valid ObjectId format
-          name: '2024-25',
-          start_date: '2024-04-01',
-          end_date: '2025-03-31',
-          is_current: true,
-          school_id: user?.school_id || '507f1f77bcf86cd799439011',
-          status: 'active'
-        });
-        console.log('📝 Using mock academic year');
+      console.log('🔍 [DEBUG] Loading academic year for user:', user);
+      console.log('🔍 [DEBUG] User school_id:', user?.school_id);
+      
+      if (!user?.school_id) {
+        throw new Error('No school ID found in user profile. Please contact administrator.');
       }
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      toast.error('Failed to load academic year information');
+
+      const academicYear = await academicService.getCurrent();
+      
+      if (academicYear && academicYear._id) {
+        setCurrentAcademicYear(academicYear);
+        console.log('✅ Loaded academic year from API:', {
+          id: academicYear._id,
+          name: academicYear.name,
+          school_id: academicYear.school_id,
+          is_current: academicYear.is_current
+        });
+      } else {
+        throw new Error('No current academic year found for your school. Please contact administrator to set up academic year.');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load academic year:', error);
+      
+      let errorMessage = 'Failed to load academic year information.';
+      if (error.response?.status === 401) {
+        errorMessage = 'Please login again to access student creation.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'No academic year found. Please contact administrator.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
+      setCurrentAcademicYear(null);
     }
   };
 
   const loadSections = async (standard: number) => {
     try {
-      console.log('Loading sections for standard:', standard);
-      const sectionsData = await sectionsService.getByStandard(standard);
-      console.log('Loaded sections:', sectionsData);
-      setSections(sectionsData);
+      console.log('🔍 [DEBUG] Starting loadSections for standard:', standard);
+      console.log('🔍 [DEBUG] Current academic year:', currentAcademicYear);
+      console.log('🔍 [DEBUG] Academic year ID:', currentAcademicYear?._id);
+      console.log('🔍 [DEBUG] User info:', user);
+      console.log('🔍 [DEBUG] User school ID:', user?.school_id);
+      
+      if (!currentAcademicYear?._id) {
+        console.warn('⚠️ [WARNING] No academic year ID available, API call may fail');
+      }
+      
+      console.log('📡 [API] Calling sectionsService.getByStandard with params:', {
+        standard,
+        academicYearId: currentAcademicYear?._id
+      });
+      
+      const sectionsData = await sectionsService.getByStandard(standard, currentAcademicYear?._id);
+      
+      console.log('📦 [API RESPONSE] Raw sections data:', sectionsData);
+      console.log('📦 [API RESPONSE] Data type:', typeof sectionsData);
+      console.log('📦 [API RESPONSE] Is array:', Array.isArray(sectionsData));
+      console.log('📦 [API RESPONSE] Data length:', sectionsData?.length);
+      
+      if (Array.isArray(sectionsData) && sectionsData.length > 0) {
+        console.log('✅ [SUCCESS] Sections loaded successfully:', sectionsData.map(s => ({ id: s._id, name: s.name, standard: s.standard })));
+      } else if (Array.isArray(sectionsData) && sectionsData.length === 0) {
+        console.warn('⚠️ [WARNING] API returned empty sections array for standard:', standard);
+        console.warn('⚠️ [WARNING] This might indicate:');
+        console.warn('  - No sections exist for this class');
+        console.warn('  - Academic year filter is excluding results');
+        console.warn('  - Backend API issue');
+      } else {
+        console.error('❌ [ERROR] Unexpected response format:', sectionsData);
+      }
+      
+      const sectionsArray = Array.isArray(sectionsData) ? sectionsData : [];
+      setSections(sectionsArray);
       
       // Reset section selection when class changes
       if (formData.section && !sectionsData.find(s => s.name === formData.section)) {
+        console.log('🔄 [INFO] Resetting section selection - previous section not found in new data');
         setFormData(prev => ({ ...prev, section: '' }));
       }
-    } catch (error) {
-      console.error('Failed to load sections:', error);
-      toast.error('Failed to load sections');
+      
+      console.log('🎯 [FINAL] Sections state updated:', sectionsArray);
+      
+    } catch (error: any) {
+      console.error('❌ [ERROR] Failed to load sections:', error);
+      console.error('❌ [ERROR] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url,
+        method: error.config?.method,
+        params: error.config?.params
+      });
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+      toast.error(`Failed to load sections: ${errorMessage}`);
       setSections([]);
       setFormData(prev => ({ ...prev, section: '' }));
     }

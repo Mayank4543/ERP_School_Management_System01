@@ -45,12 +45,14 @@ export class StudentsController {
   @ApiOperation({ summary: 'Get all students' })
   @ApiQuery({ name: 'academic_year_id', required: false })
   @ApiQuery({ name: 'standard', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive', 'transferred', 'graduated'] })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   async findAll(
     @CurrentUser() user: any,
     @Query('academic_year_id') academicYearId?: string,
     @Query('standard') standard?: number,
+    @Query('status') status?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
@@ -60,6 +62,7 @@ export class StudentsController {
     console.log('  user object:', user);
     console.log('  academicYearId:', academicYearId);
     console.log('  standard:', standard);
+    console.log('  status:', status);
 
     const result = await this.studentsService.findAll(
       user.schoolId,
@@ -67,6 +70,7 @@ export class StudentsController {
       standard ? Number(standard) : undefined,
       page ? Number(page) : 1,
       limit ? Number(limit) : 20,
+      status,
     );
 
     return {

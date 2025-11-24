@@ -25,7 +25,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('teachers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TeachersController {
-  constructor(private readonly teachersService: TeachersService) {}
+  constructor(private readonly teachersService: TeachersService) { }
 
   @Post()
   @Roles('admin', 'superadmin')
@@ -41,22 +41,43 @@ export class TeachersController {
 
   @Get()
   @ApiOperation({ summary: 'Get all teachers' })
+  @ApiQuery({ name: 'school_id', required: false })
   @ApiQuery({ name: 'department', required: false })
+  @ApiQuery({ name: 'designation', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAll(
     @CurrentUser() user: any,
+    @Query('school_id') schoolId?: string,
     @Query('department') department?: string,
+    @Query('designation') designation?: string,
     @Query('status') status?: string,
     @Query('search') search?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    const result = await this.teachersService.findAll(
-      user.schoolId,
+    // Use provided school_id or fallback to user's school
+    const targetSchoolId = schoolId || user.school_id || user.schoolId;
+
+    console.log('Teachers Controller - findAll:', {
+      targetSchoolId,
+      userSchoolId: user.school_id,
+      userSchoolIdAlt: user.schoolId,
+      providedSchoolId: schoolId,
       department,
+      designation,
+      status,
+      search,
+      page,
+      limit
+    });
+
+    const result = await this.teachersService.findAll(
+      targetSchoolId,
+      department,
+      designation,
       status,
       search,
       page ? Number(page) : 1,
@@ -110,6 +131,28 @@ export class TeachersController {
   @ApiOperation({ summary: 'Delete teacher' })
   async remove(@Param('id') id: string) {
     await this.teachersService.remove(id);
+  }
+
+  @Get('debug/:schoolId')
+  @ApiOperation({ summary: 'Debug endpoint to check teachers data' })
+  async debugTeachers(@Param('schoolId') schoolId: string) {
+    // Simple query to check if teachers exist
+    const teachersCount = await this.teachersService['teacherModel'].countDocuments({
+      school_id: new (require('mongoose')).Types.ObjectId(schoolId)
+    }).exec();
+
+    const allTeachers = await this.teachersService['teacherModel'].find({
+      school_id: new (require('mongoose')).Types.ObjectId(schoolId)
+    }).limit(5).exec();
+
+    return {
+      success: true,
+      data: {
+        totalTeachers: teachersCount,
+        sampleTeachers: allTeachers,
+        schoolId: schoolId
+      }
+    };
   }
 
   @Get('subject/:subject')

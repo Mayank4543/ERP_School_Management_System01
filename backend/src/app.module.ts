@@ -9,6 +9,9 @@ import { AcademicModule } from './modules/academic/academic.module';
 import { StudentsModule } from './modules/students/students.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { TeachersModule } from './modules/teachers/teachers.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { SectionsModule } from './modules/sections/sections.module';
+import { TeacherAssignmentsModule } from './modules/teacher-assignments/teacher-assignments.module';
 import { ExamsModule } from './modules/exams/exams.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { HomeworkModule } from './modules/homework/homework.module';
@@ -64,6 +67,9 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
     // Academic Modules
     StudentsModule,
     TeachersModule,
+    SubjectsModule,
+    SectionsModule,
+    TeacherAssignmentsModule,
     AttendanceModule,
     ExamsModule,
     AssignmentsModule,

@@ -7,6 +7,7 @@ export interface TeacherFilters {
   limit?: number;
   search?: string;
   department?: string;
+  designation?: string;
   subject?: string;
   status?: 'active' | 'inactive';
 }
@@ -24,6 +25,8 @@ const teachersService = {
    * Get all teachers
    */
   async getAll(filters: TeacherFilters): Promise<TeacherResponse> {
+    console.log('Teachers service - making API call with filters:', filters);
+
     const response = await apiClient.get('/teachers', {
       params: {
         school_id: filters.schoolId,
@@ -31,13 +34,19 @@ const teachersService = {
         limit: filters.limit || 20,
         ...(filters.search && { search: filters.search }),
         ...(filters.department && { department: filters.department }),
+        ...(filters.designation && { designation: filters.designation }),
         ...(filters.subject && { subject: filters.subject }),
         ...(filters.status && { status: filters.status }),
       },
     });
-    
+
+    console.log('Teachers service - API response:', response.data);
+
+    // Handle case where data might be empty or null
+    const teachersData = response.data.data || [];
+
     // Transform the backend data to match our frontend Teacher interface
-    const transformedData = response.data.data.map((teacher: any) => {
+    const transformedData = teachersData.map((teacher: any) => {
       const nameParts = teacher.user_id?.name?.split(' ') || [];
       return {
         ...teacher,
@@ -58,27 +67,35 @@ const teachersService = {
         state: teacher.user_id?.profile?.state || '',
         country: teacher.user_id?.profile?.country || '',
         pincode: teacher.user_id?.profile?.pincode || '',
+        // Handle profile picture - check multiple possible locations
+        profile_picture: teacher.user_id?.profile_picture || teacher.user_id?.profile?.profile_picture || teacher.profile_picture,
         // Map other fields as needed
         is_active: teacher.status === 'active',
       };
     });
 
-    return {
-      success: response.data.success || true,
+    const result = {
+      success: response.data.success !== false,
       data: transformedData,
       page: response.data.page || filters.page || 1,
       total: response.data.total || 0,
       totalPages: response.data.totalPages || 0,
     };
+
+    console.log('Teachers service - returning result:', result);
+    return result;
   },
 
   /**
    * Get teacher by ID
    */
   async getById(id: string): Promise<Teacher> {
+    console.log('Teachers service - getById called with:', id);
     const response = await apiClient.get(`/teachers/${id}`);
+    console.log('Teachers service - getById raw response:', response.data);
+
     const teacher = response.data.data;
-    
+
     // Transform the backend data to match our frontend Teacher interface
     const nameParts = teacher.user_id?.name?.split(' ') || [];
     return {
@@ -100,8 +117,8 @@ const teachersService = {
       state: teacher.user_id?.profile?.state || '',
       country: teacher.user_id?.profile?.country || '',
       pincode: teacher.user_id?.profile?.pincode || '',
-      // Map other fields
-      is_active: teacher.status === 'active',
+      // Handle profile picture - use the user's profile_picture if available
+      profile_picture: teacher.user_id?.profile_picture || teacher.user_id?.profile?.profile_picture || teacher.profile_picture,
     };
   },
 
@@ -116,7 +133,7 @@ const teachersService = {
   /**
    * Create new teacher
    */
-  async create(data: Partial<Teacher>): Promise<Teacher> {
+  async create(data: Partial<Teacher> & { profileImage?: File }): Promise<Teacher> {
     // First create the user account
     const userData = {
       name: `${data.first_name} ${data.middle_name ? data.middle_name + ' ' : ''}${data.last_name}`,
@@ -131,11 +148,25 @@ const teachersService = {
     const userResponse = await apiClient.post('/users', userData);
     const user = userResponse.data.data;
 
+    // Upload profile image if provided
+    let profileImageUrl = '';
+    if (data.profileImage) {
+      const formData = new FormData();
+      formData.append('file', data.profileImage);
+
+      const uploadResponse = await apiClient.post('/upload/image?type=teacher', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      profileImageUrl = uploadResponse.data.data.imageUrl;
+    }
+
     // Create user profile with additional personal information
     const profileData = {
-      first_name: data.first_name,
-      middle_name: data.middle_name || '',
-      last_name: data.last_name,
+      school_id: data.school_id, // Include school_id for validation
+      firstname: data.first_name,
+      lastname: data.last_name,
       gender: data.gender,
       date_of_birth: data.date_of_birth,
       blood_group: data.blood_group,
@@ -144,6 +175,7 @@ const teachersService = {
       state: data.state,
       country: data.country,
       pincode: data.pincode,
+      profile_picture: profileImageUrl,
     };
 
     await apiClient.post(`/users/${user._id}/profile`, profileData);
@@ -168,29 +200,43 @@ const teachersService = {
   /**
    * Update teacher
    */
-  async update(id: string, data: Partial<Teacher>): Promise<Teacher> {
+  async update(id: string, data: Partial<Teacher> & { profileImage?: File }): Promise<Teacher> {
     // First get the current teacher data directly from backend to get the user_id
     const currentResponse = await apiClient.get(`/teachers/${id}`);
     const currentTeacher = currentResponse.data.data;
     const userId = currentTeacher.user_id?._id || currentTeacher.user_id;
-    
+
     if (!userId) {
       throw new Error('Unable to find associated user for this teacher');
     }
-    
+
+    // Upload profile image if provided
+    let profileImageUrl = '';
+    if (data.profileImage) {
+      const formData = new FormData();
+      formData.append('file', data.profileImage);
+
+      const uploadResponse = await apiClient.post('/upload/image?type=teacher', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      profileImageUrl = uploadResponse.data.data.imageUrl;
+    }
+
     // Update user information if name or contact details changed
     if (data.first_name || data.last_name || data.email || data.phone) {
       const userData: any = {};
-      
+
       if (data.first_name || data.last_name) {
         const currentName = currentTeacher.user_id?.name || '';
         const nameParts = currentName.split(' ');
         userData.name = `${data.first_name || nameParts[0] || ''} ${data.middle_name || nameParts[1] || ''} ${data.last_name || nameParts.slice(2).join(' ') || nameParts.slice(1).join(' ') || ''}`.trim();
       }
-      
+
       if (data.email) userData.email = data.email;
       if (data.phone) userData.mobile_no = data.phone;
-      
+
       if (Object.keys(userData).length > 0) {
         await apiClient.put(`/users/${userId}`, userData);
       }
@@ -198,9 +244,8 @@ const teachersService = {
 
     // Update user profile if personal information changed
     const profileData: any = {};
-    if (data.first_name) profileData.first_name = data.first_name;
-    if (data.middle_name !== undefined) profileData.middle_name = data.middle_name;
-    if (data.last_name) profileData.last_name = data.last_name;
+    if (data.first_name) profileData.firstname = data.first_name;
+    if (data.last_name) profileData.lastname = data.last_name;
     if (data.gender) profileData.gender = data.gender;
     if (data.date_of_birth) profileData.date_of_birth = data.date_of_birth;
     if (data.blood_group !== undefined) profileData.blood_group = data.blood_group;
@@ -209,6 +254,7 @@ const teachersService = {
     if (data.state !== undefined) profileData.state = data.state;
     if (data.country !== undefined) profileData.country = data.country;
     if (data.pincode !== undefined) profileData.pincode = data.pincode;
+    if (profileImageUrl) profileData.profile_picture = profileImageUrl;
 
     if (Object.keys(profileData).length > 0) {
       await apiClient.put(`/users/${userId}/profile`, profileData);

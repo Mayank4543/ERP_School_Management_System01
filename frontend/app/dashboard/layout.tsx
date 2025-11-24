@@ -53,6 +53,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: Home },
+    { label: 'Academic', href: '/dashboard/academic', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN] },
     { label: 'Students', href: '/dashboard/students', icon: Users, roles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.TEACHER] },
     { label: 'Teachers', href: '/dashboard/teachers', icon: GraduationCap, roles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN] },
     { label: 'Staff', href: '/dashboard/staff', icon: Users, roles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN] },
@@ -142,7 +143,7 @@ const navItems: NavItem[] = [
             ) : (
                 <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
                             <span className="text-lg font-bold text-white">SE</span>
                         </div>
                         <span className="text-xl font-bold text-gray-900 dark:text-white">School ERP</span>
@@ -169,7 +170,7 @@ const navItems: NavItem[] = [
                                 </SheetTrigger>
                                 <SheetContent side="left" className="w-64 p-0">
                                     <div className="flex items-center gap-2 px-6 py-4 border-b">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                                        <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
                                             <span className="text-lg font-bold text-white">SE</span>
                                         </div>
                                         <span className="text-xl font-bold">School ERP</span>

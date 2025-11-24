@@ -19,8 +19,7 @@ export default function AdminDashboard() {
   }, [user?.school_id]);
 
   const fetchDashboardData = async () => {
-    console.log('Admin user:', user);
-    console.log('School ID:', user?.school_id);
+   
     
     if (!user?.school_id) {
       console.error('No school_id found for admin user');
@@ -31,9 +30,9 @@ export default function AdminDashboard() {
     
     try {
       setLoading(true);
-      console.log('Fetching admin dashboard for school:', user.school_id);
+      
       const data = await dashboardService.getAdminDashboard(user.school_id);
-      console.log('Admin dashboard data:', data);
+    
       setDashboardData(data);
     } catch (error: any) {
       console.error('Failed to fetch admin dashboard:', error);
@@ -103,7 +102,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-6 text-white">
+      <div className="bg-linear-to-r from-blue-600 to-indigo-600 rounded-lg p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {user?.first_name}! 👋
         </h1>

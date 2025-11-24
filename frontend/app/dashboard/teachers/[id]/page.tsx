@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileImage from '@/components/shared/ProfileImage';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { User, Mail, Phone, MapPin, Calendar, BookOpen, GraduationCap, Edit, ArrowLeft, Building2, Clock, Award } from 'lucide-react';
@@ -28,37 +29,29 @@ export default function TeacherDetailPage() {
   const fetchTeacher = async () => {
     try {
       setLoading(true);
-      const response = await teachersService.getById(params.id as string);
-      setTeacher(response);
+      const teacher = await teachersService.getById(params.id as string);
+      setTeacher(teacher);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to fetch teacher details');
+      console.error('Error fetching teacher:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to fetch teacher details');
       router.push('/dashboard/teachers');
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data for features not yet implemented
-  const mockData = {
-    subjects: [
-      { class: '10-A', subject: 'Physics', periods: 6 },
-      { class: '10-B', subject: 'Physics', periods: 6 },
-      { class: '9-A', subject: 'Physics', periods: 5 },
-    ],
-    schedule: [
-      { day: 'Monday', periods: ['10-A Physics', 'Free', '10-B Physics', '9-A Physics', 'Free', 'Lab'] },
-      { day: 'Tuesday', periods: ['10-A Physics', '10-B Physics', 'Free', '9-A Physics', 'Lab', 'Free'] },
-      { day: 'Wednesday', periods: ['Free', '10-A Physics', '10-B Physics', 'Free', '9-A Physics', 'Lab'] },
-      { day: 'Thursday', periods: ['10-B Physics', 'Free', '10-A Physics', '9-A Physics', 'Free', 'Free'] },
-      { day: 'Friday', periods: ['Lab', '10-A Physics', 'Free', '10-B Physics', '9-A Physics', 'Free'] },
-    ],
-    performance: {
-      totalClasses: 156,
-      conducted: 152,
-      percentage: 97.4,
-      avgStudentScore: 78.5,
-      studentsCount: 120,
-    },
+  // Generate subjects data from teacher's subjects array
+  const generateSubjectsData = (teacher: Teacher) => {
+    if (!teacher.subjects || teacher.subjects.length === 0) {
+      return [];
+    }
+
+
+    return teacher.subjects.map((subject, index) => ({
+      class: `Class-${index + 9}`, // Generate class names like Class-9, Class-10, etc.
+      subject: subject,
+      periods: Math.floor(Math.random() * 3) + 4, // Random periods between 4-6
+    }));
   };
 
   if (loading) {
@@ -94,7 +87,7 @@ export default function TeacherDetailPage() {
   }
 
   const fullName = `${teacher.first_name} ${teacher.middle_name ? teacher.middle_name + ' ' : ''}${teacher.last_name}`;
-  const initials = `${teacher.first_name[0]}${teacher.last_name[0]}`;
+
 
   return (
     <div className="space-y-6">
@@ -104,15 +97,18 @@ export default function TeacherDetailPage() {
         Back to Teachers
       </Button>
 
+
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-6">
-          <Avatar className="h-24 w-24">
-            <AvatarImage src={teacher.profile_picture} />
-            <AvatarFallback className="text-2xl bg-blue-500 text-white">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <ProfileImage
+            src={teacher.profile_picture}
+            alt={fullName}
+            fallbackText={fullName}
+            size="xl"
+            className="border-4 border-white shadow-lg"
+          />
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{fullName}</h1>
             <div className="flex items-center gap-4 mt-2 text-gray-600 dark:text-gray-400">
@@ -120,8 +116,8 @@ export default function TeacherDetailPage() {
               <span>•</span>
               <span>{teacher.designation || 'Teacher'}</span>
               <span>•</span>
-              <Badge variant={teacher.is_active ? 'default' : 'secondary'} 
-                     className={teacher.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+              <Badge variant={teacher.is_active ? 'default' : 'secondary'}
+                className={teacher.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                 {teacher.is_active ? 'Active' : 'Inactive'}
               </Badge>
             </div>
@@ -175,7 +171,7 @@ export default function TeacherDetailPage() {
             <GraduationCap className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{mockData.subjects.length}</div>
+            <div className="text-2xl font-bold text-purple-600">{teacher.subjects?.length || 0}</div>
             <p className="text-xs text-gray-500">Active classes</p>
           </CardContent>
         </Card>
@@ -186,7 +182,7 @@ export default function TeacherDetailPage() {
             <Clock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{mockData.performance.percentage}%</div>
+            <div className="text-2xl font-bold text-orange-600">--</div>
             <p className="text-xs text-gray-500">attendance rate</p>
           </CardContent>
         </Card>
@@ -338,20 +334,28 @@ export default function TeacherDetailPage() {
               <CardTitle>Assigned Subjects & Classes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {mockData.subjects.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <div>
-                      <p className="font-semibold">{item.subject}</p>
-                      <p className="text-sm text-gray-500">Class {item.class}</p>
+              {teacher.subjects && teacher.subjects.length > 0 ? (
+                <div className="space-y-3">
+                  {teacher.subjects.map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <div>
+                        <p className="font-semibold">{typeof item === 'object' ? item.name : item}</p>
+                        <p className="text-sm text-gray-500">Subject</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-blue-600">--</p>
+                        <p className="text-sm text-gray-500">periods/week</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-blue-600">{item.periods}</p>
-                      <p className="text-sm text-gray-500">periods/week</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-500">No subjects assigned yet</p>
+                  <p className="text-sm text-gray-400 mt-2">Subjects will be displayed here once assigned to this teacher.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -363,25 +367,10 @@ export default function TeacherDetailPage() {
               <CardTitle>Weekly Schedule</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {mockData.schedule.map((day, idx) => (
-                  <div key={idx}>
-                    <h4 className="font-semibold mb-3 text-lg">{day.day}</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {day.periods.map((period, pidx) => (
-                        <div key={pidx} className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${
-                          period === 'Free' 
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-500' 
-                            : period === 'Lab'
-                            ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200'
-                            : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                        }`}>
-                          {period}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="text-center py-8">
+                <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500">Schedule not available</p>
+                <p className="text-sm text-gray-400 mt-2">Teacher schedule will be displayed here once configured.</p>
               </div>
             </CardContent>
           </Card>
@@ -398,13 +387,13 @@ export default function TeacherDetailPage() {
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Classes Conducted</p>
-                    <p className="text-2xl font-bold text-blue-600">{mockData.performance.conducted}/{mockData.performance.totalClasses}</p>
+                    <p className="text-2xl font-bold text-blue-600">--/--</p>
                     <p className="text-xs text-gray-500">This academic year</p>
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Attendance Rate</p>
-                    <p className="text-2xl font-bold text-green-600">{mockData.performance.percentage}%</p>
-                    <p className="text-xs text-gray-500">Excellent attendance</p>
+                    <p className="text-2xl font-bold text-green-600">--%</p>
+                    <p className="text-xs text-gray-500">No data available</p>
                   </div>
                 </div>
               </CardContent>
@@ -418,13 +407,13 @@ export default function TeacherDetailPage() {
                 <div className="space-y-4">
                   <div className="p-4 bg-purple-50 dark:bg-purple-900/10 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Average Student Score</p>
-                    <p className="text-2xl font-bold text-purple-600">{mockData.performance.avgStudentScore}%</p>
-                    <p className="text-xs text-gray-500">Across all subjects</p>
+                    <p className="text-2xl font-bold text-purple-600">--%</p>
+                    <p className="text-xs text-gray-500">No data available</p>
                   </div>
                   <div className="p-4 bg-orange-50 dark:bg-orange-900/10 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Students</p>
-                    <p className="text-2xl font-bold text-orange-600">{mockData.performance.studentsCount}</p>
-                    <p className="text-xs text-gray-500">Under supervision</p>
+                    <p className="text-2xl font-bold text-orange-600">--</p>
+                    <p className="text-xs text-gray-500">No data available</p>
                   </div>
                 </div>
               </CardContent>

@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, X, Loader2, ArrowLeft, Upload, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import studentsService from '@/lib/api/services/students.service';
-import sectionsService, { type Section } from '@/lib/api/services/sections.service';
+import sectionsService from '@/lib/api/services/sections.service';
+import { type Section } from '@/types/academic';
 import usersService from '@/lib/api/services/users.service';
 import apiClient from '@/lib/api/client';
 
@@ -20,7 +21,7 @@ interface StudentEditData {
   user_id: any;
   section_id: any;
   admission_no: string;
-  roll_no: string;
+  roll_no?: string;
   standard: number;
   admission_date: string;
   blood_group?: string;
@@ -30,6 +31,11 @@ interface StudentEditData {
   mother_tongue?: string;
   nationality?: string;
   previous_school?: string;
+  father_name?: string;
+  mother_name?: string;
+  parent_contact?: string;
+  parent_email?: string;
+  status?: 'active' | 'inactive' | 'transferred' | 'graduated';
 }
 
 export default function EditStudentPage() {
@@ -42,12 +48,22 @@ export default function EditStudentPage() {
   const [profileImage, setProfileImage] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
+
   const [formData, setFormData] = useState({
+    // Academic Information
     roll_no: '',
     standard: '',
     section: '',
     admission_date: '',
+    status: 'active',
+
+    // Personal Information
+    first_name: '',
+    last_name: '',
+    email: '',
+    mobile_no: '',
+    gender: '',
+    date_of_birth: '',
     blood_group: '',
     religion: '',
     caste: '',
@@ -55,6 +71,16 @@ export default function EditStudentPage() {
     mother_tongue: '',
     nationality: '',
     previous_school: '',
+
+    // Parent Information
+    father_name: '',
+    mother_name: '',
+    parent_contact: '',
+    parent_email: '',
+
+    // Login Credentials (Read-only display)
+    username: '',
+    default_password: '',
   });
 
   useEffect(() => {
@@ -74,28 +100,54 @@ export default function EditStudentPage() {
       setFetching(true);
       const student = await studentsService.getById(id);
       console.log('Fetched student for edit:', student);
-      
+
       setStudentData(student);
-      
+
       // Set profile image
-      const userProfileImage = typeof student.user_id === 'object' ? student.user_id?.profile_picture : '';
+      const userProfileImage = (student.user_id && typeof student.user_id === 'object' && 'profile_picture' in student.user_id) ? (student.user_id as any).profile_picture : '';
       console.log('📸 Profile image URL:', userProfileImage);
+      console.log('👤 Full student data:', student);
+      console.log('👤 User data:', student.user_id);
       setProfileImage(userProfileImage || '');
-      
-      const sectionName = typeof student.section_id === 'object' ? student.section_id?.name : '';
-      
+
+      const sectionName = (student.section_id && typeof student.section_id === 'object' && 'name' in student.section_id) ? (student.section_id as any).name : '';
+
+      // Get profile data from user.profile if available
+      const userProfile = (student.user_id && typeof student.user_id === 'object' && 'profile' in student.user_id && (student.user_id as any).profile) ? (student.user_id as any).profile : null;
+      const userData = (student.user_id && typeof student.user_id === 'object') ? (student.user_id as any) : null;
+
       setFormData({
+        // Academic Information
         roll_no: student.roll_no,
         standard: student.standard.toString(),
         section: sectionName,
         admission_date: student.admission_date ? new Date(student.admission_date).toISOString().split('T')[0] : '',
-        blood_group: student.blood_group || 'none',
-        religion: student.religion || '',
+        status: student.status || 'active',
+
+        // Personal Information
+        first_name: userData?.first_name || '',
+        last_name: userData?.last_name || '',
+        email: userData?.email || '',
+        mobile_no: userData?.mobile_no || userData?.phone || '',
+        gender: userProfile?.gender || '',
+        date_of_birth: userProfile?.date_of_birth ? new Date(userProfile.date_of_birth).toISOString().split('T')[0] : '',
+        blood_group: userProfile?.blood_group || student.blood_group || 'none',
+        religion: userProfile?.religion || student.religion || '',
         caste: student.caste || '',
         category: student.category || '',
         mother_tongue: student.mother_tongue || '',
-        nationality: student.nationality || '',
+        nationality: userProfile?.nationality || student.nationality || '',
         previous_school: student.previous_school || '',
+
+        // Parent Information
+        father_name: (student as any).father_name || '',
+        mother_name: (student as any).mother_name || '',
+        parent_contact: (student as any).parent_contact || '',
+        parent_email: (student as any).parent_email || '',
+
+        // Login Credentials (Read-only)
+        username: userData?.email || userData?.username || student.admission_no,
+        default_password: `Student@${student.admission_no}`,
       });
     } catch (error: any) {
       console.error('Failed to fetch student:', error);
@@ -123,14 +175,14 @@ export default function EditStudentPage() {
         toast.error('File size must be less than 5MB');
         return;
       }
-      
+
       if (!file.type.startsWith('image/')) {
         toast.error('Please select an image file');
         return;
       }
-      
+
       setSelectedFile(file);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -142,19 +194,19 @@ export default function EditStudentPage() {
 
   const uploadProfileImage = async () => {
     if (!selectedFile || !studentData) return null;
-    
+
     setUploadingImage(true);
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      
+
       // Use the apiClient for proper authentication and base URL
       const response = await apiClient.post('/upload/image?type=profile', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       if (response.data.success) {
         return response.data.data.imageUrl;
       } else {
@@ -172,7 +224,7 @@ export default function EditStudentPage() {
 
   const updateProfileImageOnly = async () => {
     if (!selectedFile || !studentData || typeof studentData.user_id !== 'object') return;
-    
+
     try {
       const imageUrl = await uploadProfileImage();
       if (!imageUrl) return;
@@ -180,20 +232,20 @@ export default function EditStudentPage() {
       await usersService.update(studentData.user_id._id, {
         profile_picture: imageUrl
       });
-      
+
       // Update the local state to show the new image immediately
-      setStudentData(prev => ({
+      setStudentData(prev => prev ? ({
         ...prev,
         user_id: {
           ...prev.user_id as any,
           profile_picture: imageUrl
         }
-      }));
-      
+      }) : null);
+
       // Clear the selected file and reset to show the updated image
       setSelectedFile(null);
       setProfileImage(imageUrl);
-      
+
       toast.success('Profile image updated successfully!');
     } catch (error: any) {
       console.error('Failed to update profile image:', error);
@@ -204,7 +256,7 @@ export default function EditStudentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentData) return;
-    
+
     setLoading(true);
     try {
       const selectedSection = sections.find(s => s.name === formData.section);
@@ -223,12 +275,12 @@ export default function EditStudentPage() {
         }
       }
 
-      // Update student academic data
-      const updateData = {
+      // Update student academic data and parent information
+      const studentUpdateData = {
         roll_no: formData.roll_no,
         standard: parseInt(formData.standard),
         section_id: selectedSection._id,
-        admission_date: new Date(formData.admission_date),
+        admission_date: formData.admission_date, // Keep as string
         blood_group: formData.blood_group === 'none' ? undefined : formData.blood_group || undefined,
         religion: formData.religion || undefined,
         caste: formData.caste || undefined,
@@ -236,39 +288,92 @@ export default function EditStudentPage() {
         mother_tongue: formData.mother_tongue || undefined,
         nationality: formData.nationality || undefined,
         previous_school: formData.previous_school || undefined,
+        status: formData.status as 'active' | 'inactive' | 'transferred' | 'graduated',
+        // Parent Information
+        father_name: formData.father_name || undefined,
+        mother_name: formData.mother_name || undefined,
+        parent_contact: formData.parent_contact || undefined,
+        parent_email: formData.parent_email || undefined,
       };
 
-      await studentsService.update(params.id as string, updateData);
-      
-      // Update user profile image if uploaded
-      if (imageUrl && typeof studentData.user_id === 'object') {
+      await studentsService.update(params.id as string, studentUpdateData);
+
+      // Update user and user profile data
+      if (typeof studentData.user_id === 'object' && studentData.user_id?._id) {
         try {
-          await usersService.update(studentData.user_id._id, {
-            profile_picture: imageUrl
-          });
-          
+          const userUpdateData: any = {};
+
+          // Update basic user information
+          if (formData.first_name !== (studentData.user_id.first_name || '')) {
+            userUpdateData.first_name = formData.first_name;
+          }
+          if (formData.last_name !== (studentData.user_id.last_name || '')) {
+            userUpdateData.last_name = formData.last_name;
+          }
+          if (formData.email !== (studentData.user_id.email || '')) {
+            userUpdateData.email = formData.email;
+          }
+          if (formData.mobile_no !== (studentData.user_id.mobile_no || studentData.user_id.phone || '')) {
+            userUpdateData.mobile_no = formData.mobile_no;
+          }
+
+          // Add profile image if uploaded
+          if (imageUrl) {
+            userUpdateData.profile_picture = imageUrl;
+          }
+
+          // Add profile fields that should be stored in user profile
+          const profileFieldsToUpdate: any = {};
+          if (formData.gender) {
+            profileFieldsToUpdate.gender = formData.gender;
+          }
+          if (formData.date_of_birth) {
+            profileFieldsToUpdate.date_of_birth = new Date(formData.date_of_birth);
+          }
+          if (formData.blood_group && formData.blood_group !== 'none') {
+            profileFieldsToUpdate.blood_group = formData.blood_group;
+          }
+          if (formData.religion) {
+            profileFieldsToUpdate.religion = formData.religion;
+          }
+          if (formData.nationality) {
+            profileFieldsToUpdate.nationality = formData.nationality;
+          }
+
+          // If there are profile fields to update, add them
+          if (Object.keys(profileFieldsToUpdate).length > 0) {
+            userUpdateData.profile = profileFieldsToUpdate;
+          }
+
+          // Only update if there's something to update
+          if (Object.keys(userUpdateData).length > 0) {
+            await usersService.update(studentData.user_id._id, userUpdateData);
+          }
+
           // Update the local state to show the new image immediately
-          setStudentData(prev => ({
-            ...prev,
-            user_id: {
-              ...prev.user_id as any,
-              profile_picture: imageUrl
-            }
-          }));
-          
-          // Clear the selected file and reset to show the updated image
-          setSelectedFile(null);
-          setProfileImage(imageUrl);
-          
-          toast.success('Student and profile image updated successfully');
+          if (imageUrl) {
+            setStudentData(prev => ({
+              ...prev!,
+              user_id: {
+                ...prev!.user_id as any,
+                profile_picture: imageUrl
+              }
+            }));
+
+            // Clear the selected file and reset to show the updated image
+            setSelectedFile(null);
+            setProfileImage(imageUrl);
+          }
+
+          toast.success('Student and profile updated successfully');
         } catch (userError) {
-          console.error('Failed to update profile image:', userError);
-          toast.success('Student updated successfully, but failed to update profile image');
+          console.error('Failed to update user profile:', userError);
+          toast.success('Student updated successfully, but failed to update profile');
         }
       } else {
         toast.success('Student updated successfully');
       }
-      
+
       router.push(`/dashboard/students/${params.id}`);
     } catch (error: any) {
       console.error('Failed to update student:', error);
@@ -323,7 +428,7 @@ export default function EditStudentPage() {
                       src={profileImage}
                       alt={userName}
                       className="w-full h-full object-cover object-center"
-                      style={{ 
+                      style={{
                         width: '100%',
                         height: '100%',
                         aspectRatio: '1/1',
@@ -337,7 +442,7 @@ export default function EditStudentPage() {
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
+                    <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
                       {userName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -387,6 +492,85 @@ export default function EditStudentPage() {
           </CardContent>
         </Card>
 
+        {/* Personal Information */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input
+                  id="firstName"
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mobile">Mobile Number *</Label>
+                <Input
+                  id="mobile"
+                  value={formData.mobile_no}
+                  onChange={(e) => setFormData({ ...formData, mobile_no: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select
+                  value={formData.gender}
+                  onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Academic Information */}
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Academic Information</CardTitle>
@@ -405,15 +589,15 @@ export default function EditStudentPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="class">Class *</Label>
-                <Select 
-                  value={formData.standard} 
+                <Select
+                  value={formData.standard}
                   onValueChange={(value) => setFormData({ ...formData, standard: value, section: '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 7 }, (_, i) => i + 6).map((cls) => (
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((cls) => (
                       <SelectItem key={cls} value={cls.toString()}>Class {cls}</SelectItem>
                     ))}
                   </SelectContent>
@@ -422,8 +606,8 @@ export default function EditStudentPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="section">Section *</Label>
-                <Select 
-                  value={formData.section} 
+                <Select
+                  value={formData.section}
                   onValueChange={(value) => setFormData({ ...formData, section: value })}
                   disabled={!formData.standard}
                 >
@@ -451,9 +635,27 @@ export default function EditStudentPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="status">Student Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active (Can access dashboard)</SelectItem>
+                    <SelectItem value="inactive">Inactive (Dashboard access disabled)</SelectItem>
+                    <SelectItem value="transferred">Transferred</SelectItem>
+                    <SelectItem value="graduated">Graduated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="bloodGroup">Blood Group</Label>
-                <Select 
-                  value={formData.blood_group} 
+                <Select
+                  value={formData.blood_group}
                   onValueChange={(value) => setFormData({ ...formData, blood_group: value === 'none' ? '' : value })}
                 >
                   <SelectTrigger>
@@ -537,7 +739,91 @@ export default function EditStudentPage() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
 
+        {/* Parent Information */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Parent Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fatherName">Father's Name</Label>
+                <Input
+                  id="fatherName"
+                  value={formData.father_name}
+                  onChange={(e) => setFormData({ ...formData, father_name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="motherName">Mother's Name</Label>
+                <Input
+                  id="motherName"
+                  value={formData.mother_name}
+                  onChange={(e) => setFormData({ ...formData, mother_name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="parentContact">Parent Contact Number</Label>
+                <Input
+                  id="parentContact"
+                  value={formData.parent_contact}
+                  onChange={(e) => setFormData({ ...formData, parent_contact: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="parentEmail">Parent Email</Label>
+                <Input
+                  id="parentEmail"
+                  type="email"
+                  value={formData.parent_email}
+                  onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Login Credentials */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Login Credentials</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username/Email (Read-only)</Label>
+                <Input
+                  id="username"
+                  value={formData.username}
+                  readOnly
+                  className="bg-gray-50"
+                />
+                <p className="text-xs text-gray-500">Student uses email/admission number to login</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="defaultPassword">Default Password (Read-only)</Label>
+                <Input
+                  id="defaultPassword"
+                  type="text"
+                  value={formData.default_password}
+                  readOnly
+                  className="bg-gray-50"
+                />
+                <p className="text-xs text-gray-500">Student may have changed this password</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="pt-6">
             <div className="flex justify-end gap-3 pt-6">
               <Button type="button" variant="outline" onClick={() => router.back()}>
                 Cancel

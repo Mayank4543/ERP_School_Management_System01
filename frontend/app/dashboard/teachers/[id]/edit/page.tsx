@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,16 +10,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, X, ArrowLeft } from 'lucide-react';
+import { Save, X, ArrowLeft, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { Teacher } from '@/types';
 import teachersService from '@/lib/api/services/teachers.service';
+import ProfileImage from '@/components/shared/ProfileImage';
 
 export default function EditTeacherPage() {
   const params = useParams();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [currentProfilePicture, setCurrentProfilePicture] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     // Personal Information
     first_name: '',
@@ -87,11 +92,46 @@ export default function EditTeacherPage() {
         subjects: teacher.subjects || [],
         is_active: teacher.is_active ?? true,
       });
+      
+      // Set current profile picture
+      setCurrentProfilePicture(teacher.profile_picture || null);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to fetch teacher details');
       router.push('/dashboard/teachers');
     } finally {
       setFetchLoading(false);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      
+      setSelectedFile(file);
+      
+      // Create preview URL
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -120,9 +160,11 @@ export default function EditTeacherPage() {
     try {
       setLoading(true);
       
-      const teacherData: Partial<Teacher> = {
+      const teacherData: Partial<Teacher> & { profileImage?: File } = {
         ...formData,
+        gender: formData.gender as 'male' | 'female' | 'other' | undefined,
         experience_years: formData.experience_years ? parseInt(formData.experience_years) : undefined,
+        profileImage: selectedFile || undefined,
       };
 
       await teachersService.update(params.id as string, teacherData);
@@ -193,6 +235,54 @@ export default function EditTeacherPage() {
               <CardTitle>Personal Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Profile Image Upload */}
+              <div className="flex flex-col items-center space-y-4 p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="flex flex-col items-center space-y-4">
+                  <ProfileImage
+                    src={previewUrl || currentProfilePicture}
+                    alt={formData.first_name ? `${formData.first_name} ${formData.last_name}` : 'Profile'}
+                    fallbackText={formData.first_name ? `${formData.first_name} ${formData.last_name}` : 'T'}
+                    size="xl"
+                  />
+                  
+                  <div className="flex space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center space-x-2"
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span>{selectedFile || currentProfilePicture ? 'Change Photo' : 'Upload Photo'}</span>
+                    </Button>
+                    
+                    {(selectedFile || currentProfilePicture) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRemoveImage}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    Upload a profile photo (JPG, PNG, or GIF, max 5MB)
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="first_name">First Name *</Label>

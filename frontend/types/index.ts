@@ -140,6 +140,15 @@ export interface Student {
   section: string;
   profile_picture?: string;
   is_active: boolean;
+  status?: 'active' | 'inactive' | 'transferred' | 'graduated';
+  nationality?: string;
+  previous_school?: string;
+  father_name?: string;
+  mother_name?: string;
+  parent_contact?: string;
+  parent_email?: string;
+  user_id?: any; // Reference to User record
+  section_id?: any; // Reference to Section record
   created_at: string;
   updated_at: string;
 }
@@ -295,3 +304,6 @@ export interface Notification {
   link?: string;
   created_at: string;
 }
+
+// Re-export staff types
+export * from './staff';

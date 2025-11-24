@@ -92,6 +92,16 @@ export class UsersService {
   }
 
   async createProfile(userId: string, profileData: any): Promise<UserProfile> {
+    // Ensure school_id is included and properly formatted
+    if (!profileData.school_id) {
+      throw new Error('school_id is required for profile creation');
+    }
+    
+    // Convert school_id to ObjectId if it's a string
+    if (typeof profileData.school_id === 'string') {
+      profileData.school_id = new Types.ObjectId(profileData.school_id);
+    }
+
     const profile = new this.userProfileModel({
       user_id: new Types.ObjectId(userId),
       ...profileData,

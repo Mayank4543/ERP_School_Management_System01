@@ -13,17 +13,17 @@ interface ProfileImageProps {
 
 const sizeClasses = {
   sm: 'h-8 w-8',
-  md: 'h-10 w-10', 
+  md: 'h-10 w-10',
   lg: 'h-16 w-16',
   xl: 'h-32 w-32'
 };
 
-export function ProfileImage({ 
-  src, 
-  alt = 'Profile', 
-  fallbackText = 'U', 
+export function ProfileImage({
+  src,
+  alt = 'Profile',
+  fallbackText = 'U',
   size = 'md',
-  className 
+  className
 }: ProfileImageProps) {
   const initials = fallbackText
     .split(' ')
@@ -32,20 +32,35 @@ export function ProfileImage({
     .toUpperCase()
     .slice(0, 2);
 
+  // Construct full URL for uploaded profile pictures
+  // If src is already a full URL (starts with http), use it as is
+  // If it's a relative path (starts with /), prepend API URL
+  // Otherwise, use empty string
+  const imageUrl = src ?
+    (src.startsWith('http') ? src :
+      src.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL}${src}` :
+        src) :
+    '';
+
   return (
     <Avatar className={cn(sizeClasses[size], className)}>
-      <AvatarImage 
-        src={src || ''} 
+      <AvatarImage
+        src={imageUrl}
         alt={alt}
         className="object-cover object-center"
-        style={{ 
+        style={{
           aspectRatio: '1/1',
           width: '100%',
           height: '100%',
           borderRadius: '50%'
         }}
+        onError={(e) => {
+          // Hide broken image and show fallback
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+        }}
       />
-      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-medium">
+      <AvatarFallback className="bg-linear-to-br from-purple-500 to-pink-500 text-white font-medium">
         {initials}
       </AvatarFallback>
     </Avatar>

@@ -2,6 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Student, StudentDocument } from './schemas/student.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
+import { UserProfile, UserProfileDocument } from '../users/schemas/user-profile.schema';
+import { AcademicYear, AcademicYearDocument } from '../academic/schemas/academic-year.schema';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 
@@ -9,34 +12,29 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 export class StudentsService {
   constructor(
     @InjectModel(Student.name) private studentModel: Model<StudentDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(UserProfile.name) private userProfileModel: Model<UserProfileDocument>,
+    @InjectModel(AcademicYear.name) private academicYearModel: Model<AcademicYearDocument>,
   ) { }
 
   async create(createStudentDto: CreateStudentDto): Promise<Student> {
-    // Validate if user_id is a valid ObjectId
-    if (!Types.ObjectId.isValid(createStudentDto.user_id)) {
-      throw new Error(`Invalid user_id format: ${createStudentDto.user_id}`);
-    }
+    // Convert string IDs to ObjectIds
+    const studentData = {
+      ...createStudentDto,
+      user_id: new Types.ObjectId(createStudentDto.user_id),
+      school_id: new Types.ObjectId(createStudentDto.school_id),
+      academic_year_id: new Types.ObjectId(createStudentDto.academic_year_id),
+      section_id: new Types.ObjectId(createStudentDto.section_id),
+      ...(createStudentDto.route_id && {
+        route_id: new Types.ObjectId(createStudentDto.route_id)
+      }),
+      ...(createStudentDto.parent_ids && {
+        parent_ids: createStudentDto.parent_ids.map(id => new Types.ObjectId(id))
+      }),
+    };
 
-    // Validate if school_id is a valid ObjectId
-    if (!Types.ObjectId.isValid(createStudentDto.school_id)) {
-      throw new Error(`Invalid school_id format: ${createStudentDto.school_id}`);
-    }
-
-    // Validate if academic_year_id is a valid ObjectId
-    if (!Types.ObjectId.isValid(createStudentDto.academic_year_id)) {
-      throw new Error(`Invalid academic_year_id format: ${createStudentDto.academic_year_id}`);
-    }
-
-    // Validate if section_id is a valid ObjectId
-    if (!Types.ObjectId.isValid(createStudentDto.section_id)) {
-      throw new Error(`Invalid section_id format: ${createStudentDto.section_id}`);
-    }
-
-    console.log('✅ All ObjectIds validated successfully');
-    console.log('📄 Creating student with validated data:', createStudentDto);
-
-    const student = new this.studentModel(createStudentDto);
-    return student.save();
+    const createdStudent = new this.studentModel(studentData);
+    return createdStudent.save();
   }
 
   async findAll(
@@ -45,13 +43,15 @@ export class StudentsService {
     standard?: number,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ data: Student[]; total: number; page: number; totalPages: number }> {
-    // Query with both ObjectId and String to handle legacy data
+    status?: string,
+  ): Promise<{
+    data: Student[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
     const query: any = {
-      $or: [
-        { school_id: new Types.ObjectId(schoolId) },
-        { school_id: schoolId }, // Handle if stored as string
-      ],
+      school_id: new Types.ObjectId(schoolId),
       deleted_at: null,
     };
 
@@ -63,79 +63,44 @@ export class StudentsService {
       query.standard = standard;
     }
 
-    console.log('🔍 MongoDB Query:', JSON.stringify(query, null, 2));
-    console.log('📊 Query params: schoolId=', schoolId, 'page=', page, 'limit=', limit);
+    if (status) {
+      query.status = status;
+    }
 
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
+    const [students, total] = await Promise.all([
       this.studentModel
         .find(query)
+        .populate('user_id', 'first_name last_name email phone profile_picture')
         .populate({
           path: 'user_id',
-          select: 'name email mobile_no first_name last_name profile_picture',
-          match: { deleted_at: null },
           populate: {
             path: 'profile',
-            select: 'gender date_of_birth blood_group religion caste nationality mother_tongue address pincode',
-            options: { strictPopulate: false }
-          },
-          options: { strictPopulate: false }
+            model: 'UserProfile',
+            select: 'gender date_of_birth blood_group nationality religion'
+          }
         })
+        .populate('academic_year_id', 'year_name start_date end_date')
+        .populate('section_id', 'name')
         .populate({
-          path: 'academic_year_id',
-          select: 'name start_date end_date',
-          options: { strictPopulate: false }
+          path: 'parent_ids',
+          select: 'first_name last_name email phone profile_picture',
+          populate: {
+            path: 'profile',
+            model: 'UserProfile',
+            select: 'gender date_of_birth'
+          }
         })
-        .sort({ standard: 1, roll_no: 1 })
+        .sort({ created_at: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.studentModel.countDocuments(query),
+      this.studentModel.countDocuments(query).exec(),
     ]);
 
-    console.log(`✅ Found ${total} students, returning ${data.length} students`);
-    if (data.length > 0) {
-      const firstStudent = data[0] as any;
-      console.log('🔍 Raw student data after population:');
-      console.log('  - user_id type:', typeof firstStudent.user_id);
-      console.log('  - user_id value:', firstStudent.user_id);
-      console.log('  - user name:', firstStudent.user_id?.name);
-      console.log('  - user email:', firstStudent.user_id?.email);
-      console.log('  - user mobile:', firstStudent.user_id?.mobile_no);
-      console.log('  - user profile:', firstStudent.user_id?.profile);
-      console.log('  - section_id:', firstStudent.section_id);
-      console.log('  - admission_no:', firstStudent.admission_no);
-      
-      // Check if user_id exists in users collection
-      if (data[0].user_id && typeof data[0].user_id === 'string') {
-        console.log('⚠️ user_id is a string, not populated. Checking if user exists...');
-        try {
-          const userExists = await this.studentModel.db.collection('users').findOne({ 
-            _id: new Types.ObjectId(data[0].user_id) 
-          });
-          console.log('👤 User exists in DB:', !!userExists, userExists ? userExists.name : 'No user found');
-        } catch (err) {
-          console.log('❌ Error checking user:', err.message);
-        }
-      }
-      
-      // Check if section_id exists in sections collection
-      if (data[0].section_id && typeof data[0].section_id === 'string') {
-        console.log('⚠️ section_id is a string, not populated. Checking if section exists...');
-        try {
-          const sectionExists = await this.studentModel.db.collection('sections').findOne({ 
-            _id: new Types.ObjectId(data[0].section_id) 
-          });
-          console.log('📚 Section exists in DB:', !!sectionExists, sectionExists ? sectionExists.name : 'No section found');
-        } catch (err) {
-          console.log('❌ Error checking section:', err.message);
-        }
-      }
-    }
-
     return {
-      data,
+      data: students,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -144,27 +109,22 @@ export class StudentsService {
 
   async findById(id: string): Promise<Student> {
     const student = await this.studentModel
-      .findOne({ _id: id, deleted_at: null })
+      .findOne({ _id: new Types.ObjectId(id), deleted_at: null })
+      .populate('user_id', 'first_name last_name email phone profile_picture')
       .populate({
         path: 'user_id',
-        select: 'name email mobile_no first_name last_name profile_picture',
-        match: { deleted_at: null },
         populate: {
           path: 'profile',
-          select: 'gender date_of_birth blood_group religion caste nationality mother_tongue address pincode',
-          options: { strictPopulate: false }
-        },
-        options: { strictPopulate: false }
+          model: 'UserProfile',
+          select: 'gender date_of_birth blood_group nationality religion'
+        }
       })
-      .populate({
-        path: 'academic_year_id',
-        select: 'name start_date end_date',
-        options: { strictPopulate: false }
-      })
+      .populate('academic_year_id', 'year_name start_date end_date')
+      .populate('section_id', 'name')
       .exec();
 
     if (!student) {
-      throw new NotFoundException(`Student with ID ${id} not found`);
+      throw new NotFoundException('Student not found');
     }
 
     return student;
@@ -173,10 +133,21 @@ export class StudentsService {
   async findByAdmissionNo(admissionNo: string): Promise<Student> {
     const student = await this.studentModel
       .findOne({ admission_no: admissionNo, deleted_at: null })
+      .populate('user_id', 'first_name last_name email phone profile_picture')
+      .populate({
+        path: 'user_id',
+        populate: {
+          path: 'profile',
+          model: 'UserProfile',
+          select: 'gender date_of_birth blood_group nationality religion'
+        }
+      })
+      .populate('academic_year_id', 'year_name start_date end_date')
+      .populate('section_id', 'name')
       .exec();
 
     if (!student) {
-      throw new NotFoundException(`Student with admission number ${admissionNo} not found`);
+      throw new NotFoundException('Student not found');
     }
 
     return student;
@@ -185,42 +156,67 @@ export class StudentsService {
   async findByUserId(userId: string): Promise<Student> {
     const student = await this.studentModel
       .findOne({ user_id: new Types.ObjectId(userId), deleted_at: null })
+      .populate('user_id', 'first_name last_name email phone')
+      .populate('academic_year_id', 'year_name start_date end_date')
       .exec();
 
     if (!student) {
-      throw new NotFoundException(`Student with user ID ${userId} not found`);
+      throw new NotFoundException('Student not found');
     }
 
     return student;
   }
 
   async update(id: string, updateStudentDto: UpdateStudentDto): Promise<Student> {
-    const student = await this.studentModel
-      .findOneAndUpdate(
-        { _id: id, deleted_at: null },
-        { ...updateStudentDto, updated_at: new Date() },
-        { new: true },
-      )
-      .exec();
+    // Convert string IDs to ObjectIds for update
+    const updateData: any = { ...updateStudentDto };
 
-    if (!student) {
-      throw new NotFoundException(`Student with ID ${id} not found`);
+    if (updateData.user_id) {
+      updateData.user_id = new Types.ObjectId(updateData.user_id);
+    }
+    if (updateData.school_id) {
+      updateData.school_id = new Types.ObjectId(updateData.school_id);
+    }
+    if (updateData.academic_year_id) {
+      updateData.academic_year_id = new Types.ObjectId(updateData.academic_year_id);
+    }
+    if (updateData.section_id) {
+      updateData.section_id = new Types.ObjectId(updateData.section_id);
+    }
+    if (updateData.route_id) {
+      updateData.route_id = new Types.ObjectId(updateData.route_id);
+    }
+    if (updateData.parent_ids) {
+      updateData.parent_ids = updateData.parent_ids.map((id: string) => new Types.ObjectId(id));
     }
 
-    return student;
+    const updatedStudent = await this.studentModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(id), deleted_at: null },
+        { $set: { ...updateData, updated_at: new Date() } },
+        { new: true },
+      )
+      .populate('user_id', 'first_name last_name email phone')
+      .populate('academic_year_id', 'year_name start_date end_date')
+      .exec();
+
+    if (!updatedStudent) {
+      throw new NotFoundException('Student not found');
+    }
+
+    return updatedStudent;
   }
 
   async remove(id: string): Promise<void> {
     const result = await this.studentModel
-      .findOneAndUpdate(
-        { _id: id, deleted_at: null },
-        { deleted_at: new Date() },
-        { new: true },
+      .updateOne(
+        { _id: new Types.ObjectId(id) },
+        { $set: { deleted_at: new Date() } },
       )
       .exec();
 
-    if (!result) {
-      throw new NotFoundException(`Student with ID ${id} not found`);
+    if (result.modifiedCount === 0) {
+      throw new NotFoundException('Student not found');
     }
   }
 
@@ -233,24 +229,17 @@ export class StudentsService {
     const query: any = {
       school_id: new Types.ObjectId(schoolId),
       standard,
+      section_id: new Types.ObjectId(sectionId),
       deleted_at: null,
     };
 
-    // Only add academicYearId if it's a valid ObjectId
-    if (academicYearId && Types.ObjectId.isValid(academicYearId)) {
+    if (academicYearId) {
       query.academic_year_id = new Types.ObjectId(academicYearId);
-    }
-
-    // Handle sectionId - it might be a simple string like "A" or an ObjectId
-    if (Types.ObjectId.isValid(sectionId)) {
-      query.section_id = new Types.ObjectId(sectionId);
-    } else {
-      // If not a valid ObjectId, treat it as a section name/code
-      query.section = sectionId;
     }
 
     return this.studentModel
       .find(query)
+      .populate('user_id', 'first_name last_name email phone')
       .sort({ roll_no: 1 })
       .exec();
   }

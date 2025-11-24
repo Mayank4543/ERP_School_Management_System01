@@ -9,7 +9,7 @@ export interface Student {
   roll_no: string;
   standard: number;
   section_id: string;
-  is_active: boolean;
+  status: 'active' | 'inactive' | 'transferred' | 'graduated';
   admission_date: string;
   blood_group?: string;
   religion?: string;
@@ -90,6 +90,7 @@ const studentsService = {
         ...(filters.search && { search: filters.search }),
         ...(filters.standard && { standard: filters.standard }),
         ...(filters.section && { section: filters.section }),
+        ...(filters.status && { status: filters.status }),
         ...(filters.academic_year_id && { academic_year_id: filters.academic_year_id }),
       },
     });

@@ -54,14 +54,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Debug logging for student creation errors
-    if (error.config?.method === 'post' && error.config?.url?.includes('students')) {
-      console.log('❌ Student Creation Error:');
-      console.log('Status:', error.response?.status);
-      console.log('Data:', error.response?.data);
-      console.log('Request data:', error.config?.data);
-    }
-
+    
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
