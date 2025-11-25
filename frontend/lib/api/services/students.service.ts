@@ -2,7 +2,14 @@ import apiClient from '../client';
 
 export interface Student {
   _id: string;
-  user_id: string;
+  user_id: {
+    _id: string;
+    first_name: string;
+    last_name: string;
+    email?: string;
+    phone?: string;
+    profile_picture?: string;
+  } | string; // Handle both populated and unpopulated cases
   school_id: string;
   academic_year_id: string;
   admission_no: string;

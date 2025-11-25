@@ -1,23 +1,27 @@
-import { Redirect } from 'expo-router';
+import React, { useEffect } from 'react';
+import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { theme } from '@/theme/theme';
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/splash');
+      }
+    }
+  }, [isAuthenticated, isLoading]);
 
-  if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
-  }
-
-  return <Redirect href="/(auth)/login" />;
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -25,6 +29,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
 });
 

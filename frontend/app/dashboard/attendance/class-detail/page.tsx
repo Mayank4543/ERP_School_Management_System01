@@ -16,12 +16,22 @@ interface Student {
     _id: string;
     user_id: {
         _id: string;
-        first_name: string;
-        last_name: string;
+        first_name?: string;
+        last_name?: string;
+        email: string;
+        phone?: string;
         profile_picture?: string;
     } | string; // Handle both populated and unpopulated cases
     roll_no: string;
     admission_no: string;
+    school_id: string;
+    academic_year_id: string;
+    standard: number;
+    section_id: string;
+    status: string;
+    admission_date: string;
+    father_name?: string;
+    mother_name?: string;
 }
 
 // Helper function to safely get user ID
@@ -32,6 +42,51 @@ const getUserId = (user_id: Student['user_id']): string => {
 // Helper function to safely get user info
 const getUserInfo = (user_id: Student['user_id']) => {
     return typeof user_id === 'object' && user_id !== null ? user_id : null;
+};
+
+// Helper function to get student display name
+const getStudentDisplayName = (student: Student): string => {
+    const userInfo = getUserInfo(student.user_id);
+
+    // Try to get full name first
+    if (userInfo?.first_name && userInfo?.last_name) {
+        return `${userInfo.first_name} ${userInfo.last_name}`;
+    }
+
+    // Try individual name parts
+    if (userInfo?.first_name) {
+        return userInfo.first_name;
+    }
+
+    // Try to extract name from email
+    if (userInfo?.email) {
+        const emailName = userInfo.email.split('@')[0];
+        // Convert formats like "raghav.kumar.2005" to "Raghav Kumar"
+        const cleanName = emailName
+            .replace(/\./g, ' ')           // Replace dots with spaces
+            .replace(/\d+/g, '')          // Remove numbers
+            .split(' ')
+            .filter(part => part.length > 0) // Remove empty parts
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize
+            .join(' ')
+            .trim();
+
+        if (cleanName) {
+            return cleanName;
+        }
+    }
+
+    // Try father's name or mother's name
+    if (student.father_name) {
+        return `Child of ${student.father_name}`;
+    }
+
+    if (student.mother_name) {
+        return `Child of ${student.mother_name}`;
+    }
+
+    // Final fallbacks
+    return student.admission_no || `Student ${student.roll_no}` || 'Unknown Student';
 };
 
 interface AttendanceRecord {
@@ -78,6 +133,17 @@ export default function ClassDetailPage() {
                 studentsService.getByClass(user.school_id, parseInt(standard), sectionId),
                 attendanceService.getByDateAndClass(user.school_id, date, parseInt(standard), sectionId)
             ]);
+
+            console.log('🔍 Students data received:', studentsData);
+            console.log('🔍 Sample student:', studentsData[0]);
+            console.log('🔍 Sample user_id type:', typeof studentsData[0]?.user_id);
+            console.log('🔍 Sample user_id value:', studentsData[0]?.user_id);
+            console.log('🔍 Processing display names...');
+
+            // Test the display name function with first student
+            if (studentsData[0]) {
+                console.log('🔍 Display name for first student:', getStudentDisplayName(studentsData[0]));
+            }
 
             setStudents(studentsData);
             setAttendanceData(attendance);
@@ -267,16 +333,19 @@ export default function ClassDetailPage() {
                                                 />
                                             ) : (
                                                 <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                                    {userInfo?.first_name?.charAt(0) || '?'}
+                                                    {getStudentDisplayName(student).charAt(0).toUpperCase()}
                                                 </span>
                                             )}
                                         </div>
                                         <div>
                                             <h4 className="font-medium text-gray-900 dark:text-white">
-                                                {userInfo ? `${userInfo.first_name} ${userInfo.last_name}` : 'Unknown Student'}
+                                                {getStudentDisplayName(student)}
                                             </h4>
                                             <p className="text-sm text-gray-500">
                                                 Roll: {student.roll_no} | Admission: {student.admission_no}
+                                                {userInfo?.email && (
+                                                    <span className="ml-2 text-blue-600">• {userInfo.email}</span>
+                                                )}
                                             </p>
                                         </div>
                                     </div>
