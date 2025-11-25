@@ -239,7 +239,7 @@ export class StudentsService {
 
     return this.studentModel
       .find(query)
-      .populate('user_id', 'first_name last_name email phone')
+      .populate('user_id', 'first_name last_name email phone profile_picture')
       .sort({ roll_no: 1 })
       .exec();
   }

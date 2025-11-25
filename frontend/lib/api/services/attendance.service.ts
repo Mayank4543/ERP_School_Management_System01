@@ -14,11 +14,14 @@ export interface AttendanceFilters {
 export interface MarkAttendanceData {
   school_id: string;
   date: string;
-  class: number;
-  section: string;
-  attendance_records: Array<{
-    student_id: string;
-    status: 'present' | 'absent' | 'late' | 'half_day' | 'on_leave';
+  user_type: 'student' | 'teacher' | 'staff';
+  academic_year_id?: string;
+  standard?: number;
+  section_id?: string;
+  attendance: Array<{
+    user_id: string;
+    status: 'present' | 'absent' | 'late' | 'half_day' | 'leave';
+    reason?: string;
     remarks?: string;
   }>;
 }
@@ -31,6 +34,19 @@ export interface AttendanceReport {
   absent_days: number;
   late_days: number;
   percentage: number;
+  class?: string;
+  standard?: number;
+  section?: string;
+}
+
+export interface AttendanceSummary {
+  total_students: number;
+  present: number;
+  absent: number;
+  late: number;
+  on_leave: number;
+  half_day: number;
+  attendance_percentage: number;
 }
 
 const attendanceService = {
@@ -38,8 +54,16 @@ const attendanceService = {
    * Mark attendance for class
    */
   async markAttendance(data: MarkAttendanceData): Promise<any> {
-    const response = await apiClient.post('/attendance/mark', data);
-    return response.data;
+    try {
+      console.log('Sending attendance data:', data);
+      const response = await apiClient.post('/attendance/mark', data);
+      console.log('Attendance response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Attendance marking failed:', error);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
   },
 
   /**
@@ -51,15 +75,14 @@ const attendanceService = {
     standard: number,
     section: string
   ): Promise<Attendance[]> {
-    const response = await apiClient.get('/attendance', {
+    const response = await apiClient.get(`/attendance/date/${date}`, {
       params: {
-        school_id: schoolId,
-        date,
+        user_type: 'student',
         standard,
-        section,
+        section_id: section,
       },
     });
-    return response.data.data;
+    return response.data.data || [];
   },
 
   /**
@@ -76,7 +99,7 @@ const attendanceService = {
         ...(endDate && { end_date: endDate }),
       },
     });
-    return response.data.data;
+    return response.data.data || [];
   },
 
   /**
@@ -98,7 +121,7 @@ const attendanceService = {
         end_date: endDate,
       },
     });
-    return response.data.data;
+    return response.data.data || [];
   },
 
   /**
@@ -106,15 +129,26 @@ const attendanceService = {
    */
   async getSummary(
     schoolId: string,
+    academicYearId: string,
+    userType: string = 'student',
     date?: string
-  ): Promise<any> {
+  ): Promise<AttendanceSummary> {
     const response = await apiClient.get('/attendance/summary', {
       params: {
-        school_id: schoolId,
+        academic_year_id: academicYearId,
+        user_type: userType,
         ...(date && { date }),
       },
     });
-    return response.data.data;
+    return response.data.data || {
+      total_students: 0,
+      present: 0,
+      absent: 0,
+      late: 0,
+      on_leave: 0,
+      half_day: 0,
+      attendance_percentage: 0,
+    };
   },
 
   /**
