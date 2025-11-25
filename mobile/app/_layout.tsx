@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { PaperProvider } from 'react-native-paper';
 import { theme } from '@/theme/theme';
+import Toast from 'react-native-toast-message';
 
 export default function RootLayout() {
   return (
@@ -15,6 +16,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
+        <Toast />
       </AuthProvider>
     </PaperProvider>
   );

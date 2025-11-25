@@ -8,6 +8,7 @@ import {
     Alert,
     Dimensions,
     Animated,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -129,17 +130,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ isVisible, onClose }) => {
                     {/* Header Section */}
                     <View style={styles.header}>
                         <View style={styles.userSection}>
-                            <View style={[styles.userAvatar, { backgroundColor: getRoleColor() }]}>
-                                <Text style={styles.userInitials}>
-                                    {user?.first_name?.[0]}{user?.last_name?.[0]}
-                                </Text>
-                            </View>
+                            <TouchableOpacity
+                                style={styles.profileImageContainer}
+                                onPress={() => handleNavigation('/(tabs)/profile')}
+                                activeOpacity={0.8}
+                            >
+                                {user?.profile_picture ? (
+                                    <Image
+                                        source={{ uri: user.profile_picture }}
+                                        style={styles.profileImage}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <View style={[styles.userAvatar, { backgroundColor: getRoleColor() }]}>
+                                        <Text style={styles.userInitials}>
+                                            {user?.first_name?.[0]}{user?.last_name?.[0]}
+                                        </Text>
+                                    </View>
+                                )}
+                                <View style={styles.profileBadge}>
+                                    <Ionicons name="camera" size={12} color={theme.colors.onPrimary} />
+                                </View>
+                            </TouchableOpacity>
                             <View style={styles.userInfo}>
-                                <Text style={styles.userName}>
+                                <Text style={styles.userName} numberOfLines={2}>
                                     {user?.first_name} {user?.last_name}
                                 </Text>
-                                <TouchableOpacity onPress={() => handleNavigation('/(tabs)/profile')}>
+                                <Text style={styles.userRole} numberOfLines={1}>
+                                    {(role === 'student' && 'Student') ||
+                                        (role === 'teacher' && 'Teacher') ||
+                                        (role === 'parent' && 'Parent') ||
+                                        'User'}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => handleNavigation('/(tabs)/profile')}
+                                    style={styles.viewProfileButton}
+                                >
                                     <Text style={styles.viewProfile}>View Profile</Text>
+                                    <Ionicons name="chevron-forward" size={14} color={theme.colors.primary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -216,36 +244,76 @@ const styles = StyleSheet.create({
     },
     userSection: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         padding: spacing.lg,
         paddingTop: spacing.xl,
     },
+    profileImageContainer: {
+        position: 'relative',
+        marginRight: spacing.md,
+    },
+    profileImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: theme.colors.primary,
+    },
     userAvatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: spacing.md,
+        borderWidth: 2,
+        borderColor: theme.colors.primary,
     },
     userInitials: {
         color: theme.colors.onPrimary,
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '600',
+    },
+    profileBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        backgroundColor: theme.colors.primary,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: theme.colors.surface,
     },
     userInfo: {
         flex: 1,
+        paddingTop: spacing.xs,
     },
     userName: {
         fontSize: 16,
         fontWeight: '600',
         color: theme.colors.text,
-        marginBottom: spacing.xs,
+        marginBottom: spacing.xs / 2,
+        lineHeight: 20,
+    },
+    userRole: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginBottom: spacing.sm,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    viewProfileButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
     },
     viewProfile: {
         fontSize: 14,
         color: theme.colors.primary,
         fontWeight: '500',
+        marginRight: spacing.xs,
     },
     menuContainer: {
         flex: 1,

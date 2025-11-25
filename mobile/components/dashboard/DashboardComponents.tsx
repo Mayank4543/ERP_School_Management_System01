@@ -340,7 +340,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     marginBottom: spacing.md,
-    minWidth: 100,
+    width: (SCREEN_WIDTH - (spacing.lg * 2) - (spacing.sm * 2)) / 3,
+    minHeight: 100,
   },
   categoryIcon: {
     width: 48,

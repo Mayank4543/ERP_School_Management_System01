@@ -10,41 +10,14 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // Determine tabs based on user role
+  // Show only 4 main tabs for all users
   const getTabs = () => {
-    const role = user?.roles?.[0] || user?.usergroup_id;
-    
-    switch (role) {
-      case 'student':
-        return [
-          { name: 'index', title: 'Dashboard', icon: 'view-dashboard' },
-          { name: 'attendance', title: 'Attendance', icon: 'calendar-check' },
-          { name: 'assignments', title: 'Assignments', icon: 'file-document' },
-          { name: 'exams', title: 'Exams', icon: 'school' },
-          { name: 'profile', title: 'Profile', icon: 'account' },
-        ];
-      case 'teacher':
-        return [
-          { name: 'index', title: 'Dashboard', icon: 'view-dashboard' },
-          { name: 'classes', title: 'Classes', icon: 'account-group' },
-          { name: 'attendance', title: 'Attendance', icon: 'calendar-check' },
-          { name: 'assignments', title: 'Assignments', icon: 'file-document' },
-          { name: 'profile', title: 'Profile', icon: 'account' },
-        ];
-      case 'parent':
-        return [
-          { name: 'index', title: 'Dashboard', icon: 'view-dashboard' },
-          { name: 'children', title: 'Children', icon: 'account-group' },
-          { name: 'attendance', title: 'Attendance', icon: 'calendar-check' },
-          { name: 'fees', title: 'Fees', icon: 'cash' },
-          { name: 'profile', title: 'Profile', icon: 'account' },
-        ];
-      default:
-        return [
-          { name: 'index', title: 'Dashboard', icon: 'view-dashboard' },
-          { name: 'profile', title: 'Profile', icon: 'account' },
-        ];
-    }
+    return [
+      { name: 'index', title: 'Home', icon: 'home' },
+      { name: 'assignments', title: 'Tasks', icon: 'clipboard-list' },
+      { name: 'attendance', title: 'Attendance', icon: 'calendar-check' },
+      { name: 'profile', title: 'Profile', icon: 'account' },
+    ];
   };
 
   const tabs = getTabs();

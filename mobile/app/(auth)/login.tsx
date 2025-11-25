@@ -17,6 +17,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { theme, typography, spacing, borderRadius } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 
 interface LoginForm {
   email: string;
@@ -60,14 +61,41 @@ export default function LoginScreen() {
   const { login, isLoading } = useAuth();
   const { role } = useLocalSearchParams<{ role: string }>();
   const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const [showPassword, setShowPassword] = useState(false);
 
   const roleConfig = getRoleConfig(role || 'default');
 
   const onSubmit = async (data: LoginForm) => {
     try {
+      // Show loading toast
+      Toast.show({
+        type: 'info',
+        text1: 'Signing In',
+        text2: 'Please wait...',
+        visibilityTime: 2000,
+      });
+
       await login(data.email, data.password);
+
+      // Show success toast
+      Toast.show({
+        type: 'success',
+        text1: 'Login Successful',
+        text2: 'Welcome back!',
+        visibilityTime: 2000,
+      });
+
       router.replace('/(tabs)');
     } catch (error: any) {
+      // Show error toast
+      Toast.show({
+        type: 'error',
+        text1: 'Login Failed',
+        text2: error.message || 'Invalid email or password',
+        visibilityTime: 4000,
+      });
+
+      // Also show alert as fallback
       Alert.alert('Login Failed', error.message || 'Invalid credentials');
     }
   };
@@ -126,8 +154,11 @@ export default function LoginScreen() {
                   <Text style={styles.inputLabel}>Email Address</Text>
                   <TextInput
                     mode="outlined"
+                    placeholder="Enter your email address"
+                    placeholderTextColor={theme.colors.textSecondary}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    autoCorrect={false}
                     value={value}
                     onBlur={onBlur}
                     onChangeText={onChange}
@@ -136,6 +167,7 @@ export default function LoginScreen() {
                     outlineColor={theme.colors.surfaceVariant}
                     activeOutlineColor={roleConfig.color}
                     contentStyle={styles.inputContent}
+                    left={<TextInput.Icon icon="email-outline" />}
                   />
                   {errors.email && (
                     <Text style={styles.error}>{errors.email.message}</Text>
@@ -147,13 +179,21 @@ export default function LoginScreen() {
             <Controller
               control={control}
               name="password"
-              rules={{ required: 'Password is required' }}
+              rules={{
+                required: 'Password is required',
+                minLength: {
+                  value: 6,
+                  message: 'Password must be at least 6 characters'
+                }
+              }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Password</Text>
                   <TextInput
                     mode="outlined"
-                    secureTextEntry
+                    placeholder="Enter your password"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    secureTextEntry={!showPassword}
                     value={value}
                     onBlur={onBlur}
                     onChangeText={onChange}
@@ -162,6 +202,13 @@ export default function LoginScreen() {
                     outlineColor={theme.colors.surfaceVariant}
                     activeOutlineColor={roleConfig.color}
                     contentStyle={styles.inputContent}
+                    left={<TextInput.Icon icon="lock-outline" />}
+                    right={
+                      <TextInput.Icon
+                        icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                        onPress={() => setShowPassword(!showPassword)}
+                      />
+                    }
                   />
                   {errors.password && (
                     <Text style={styles.error}>{errors.password.message}</Text>
@@ -189,6 +236,8 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Toast />
     </SafeAreaView>
   );
 }
