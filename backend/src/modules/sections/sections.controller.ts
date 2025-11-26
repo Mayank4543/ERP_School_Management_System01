@@ -66,6 +66,19 @@ export class SectionsController {
     );
   }
 
+  @Get('standards')
+  @ApiOperation({ summary: 'Get unique standards/classes for the school' })
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async getUniqueStandards(
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.sectionsService.getUniqueStandards(
+      user.schoolId || user.school_id,
+      academicYearId,
+    );
+  }
+
   @Get('standard/:standard')
   @ApiOperation({ summary: 'Get sections by standard/class' })
   @ApiQuery({ name: 'academicYearId', required: false })

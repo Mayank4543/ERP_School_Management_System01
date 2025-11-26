@@ -22,36 +22,49 @@ export default function ExamsPage() {
   });
 
   useEffect(() => {
+    console.log('User context in exams page:', user);
     fetchExams();
   }, [user?.school_id]);
 
   const fetchExams = async () => {
-    if (!user?.school_id) return;
+    if (!user?.school_id) {
+      console.log('No school_id found in user:', user);
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('Fetching exams for school:', user.school_id);
+
       const data = await examsService.getAll({
         schoolId: user.school_id,
         page: 1,
         limit: 50,
+        // Don't filter by academic year for now to see all exams
+        // academic_year_id: user.academic_year_id,
       });
-      
-      setExams(data.data);
-      
+
+      console.log('Exams API response:', data);
+
+      const examsList = data.data || [];
+      setExams(examsList);
+
       // Calculate stats
       const now = new Date();
-      const upcoming = data.data.filter((e: any) => new Date(e.start_date) > now).length;
-      const ongoing = data.data.filter((e: any) => 
+      const upcoming = examsList.filter((e: any) => new Date(e.start_date) > now).length;
+      const ongoing = examsList.filter((e: any) =>
         new Date(e.start_date) <= now && new Date(e.end_date) >= now
       ).length;
-      const completed = data.data.filter((e: any) => new Date(e.end_date) < now).length;
+      const completed = examsList.filter((e: any) => new Date(e.end_date) < now).length;
 
       setStats({
-        total: data.total,
+        total: data.total || examsList.length,
         upcoming,
         ongoing,
         completed,
       });
+
+      console.log('Exam stats:', { total: data.total || examsList.length, upcoming, ongoing, completed });
     } catch (error) {
       console.error('Error fetching exams:', error);
       toast.error('Failed to fetch exams');
@@ -157,7 +170,14 @@ export default function ExamsPage() {
 
       {/* Exams List */}
       <div className="space-y-4">
-        {exams.length > 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span>Loading exams...</span>
+            </CardContent>
+          </Card>
+        ) : exams.length > 0 ? (
           exams.map((exam) => {
             const status = getExamStatus(exam);
             return (
@@ -179,9 +199,9 @@ export default function ExamsPage() {
                           <Edit className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => handleDelete(exam._id)}
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
@@ -200,12 +220,12 @@ export default function ExamsPage() {
                       <p className="font-medium">{format(new Date(exam.end_date), 'MMM dd, yyyy')}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Total Marks</p>
-                      <p className="font-medium">{exam.total_marks}</p>
+                      <p className="text-sm text-gray-500">Subjects</p>
+                      <p className="font-medium">{exam.subjects?.length || 0} subjects</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Passing Marks</p>
-                      <p className="font-medium">{exam.passing_marks}</p>
+                      <p className="text-sm text-gray-500">Status</p>
+                      <p className="font-medium capitalize">{exam.status || 'Scheduled'}</p>
                     </div>
                   </div>
                   {exam.description && (
@@ -219,13 +239,21 @@ export default function ExamsPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-16 w-16 text-gray-400 mb-4" />
-              <p className="text-gray-500 text-center">No exams found. Create your first exam to get started.</p>
-              <Button asChild className="mt-4">
-                <Link href="/dashboard/exams/create">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Exam
-                </Link>
-              </Button>
+              <div className="text-center">
+                <p className="text-gray-500 text-lg mb-2">No exams found</p>
+                <p className="text-gray-400 text-sm mb-4">
+                  {user?.school_id
+                    ? `No exams created yet for school ID: ${user.school_id}`
+                    : 'School ID not found in user context'
+                  }
+                </p>
+                <Button asChild>
+                  <Link href="/dashboard/exams/create">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Your First Exam
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

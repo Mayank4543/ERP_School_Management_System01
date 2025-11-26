@@ -240,4 +240,22 @@ export class SectionsService {
       .sort({ standard: 1, name: 1 })
       .exec();
   }
+
+  async getUniqueStandards(schoolId: string, academicYearId?: string): Promise<number[]> {
+    const query: any = {
+      school_id: new Types.ObjectId(schoolId),
+      is_active: true,
+      deleted_at: null,
+    };
+
+    if (academicYearId && Types.ObjectId.isValid(academicYearId)) {
+      query.academic_year_id = new Types.ObjectId(academicYearId);
+    }
+
+    const standards = await this.sectionModel
+      .distinct('standard', query)
+      .exec();
+
+    return standards.sort((a, b) => a - b);
+  }
 }

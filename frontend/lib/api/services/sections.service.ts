@@ -171,6 +171,38 @@ class SectionsService {
       throw error;
     }
   }
+
+  async getUniqueStandards(academicYearId?: string): Promise<number[]> {
+    try {
+      const params = academicYearId ? { academicYearId } : {};
+      const url = `${this.baseUrl}/standards`;
+
+      console.log('🔍 [SECTIONS SERVICE] Fetching unique standards:');
+      console.log('  - URL:', url);
+      console.log('  - Params:', params);
+
+      const response = await api.get(url, { params });
+
+      console.log('📦 [SECTIONS SERVICE] Standards Response:');
+      console.log('  - Status:', response.status);
+      console.log('  - Response data:', response.data);
+      console.log('  - Final standards:', response.data.data || response.data || []);
+
+      return response.data.data || response.data || [];
+    } catch (error: any) {
+      console.error('❌ [SECTIONS SERVICE] Error fetching unique standards:', error);
+      console.error('❌ [SECTIONS SERVICE] Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method,
+        params: error.config?.params
+      });
+      throw error;
+    }
+  }
 }
 
 export const sectionsService = new SectionsService();

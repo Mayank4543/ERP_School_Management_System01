@@ -334,8 +334,8 @@ export default function SystemLogsPage() {
               return (
                 <div key={log.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-2 min-w-0">
-                    <LevelIcon className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                    <CategoryIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <LevelIcon className="h-5 w-5 text-gray-500 shrink-0" />
+                    <CategoryIcon className=" teshrink-0" />
                   </div>
                   
                   <div className="flex-1 min-w-0">

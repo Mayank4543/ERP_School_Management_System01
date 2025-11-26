@@ -113,7 +113,7 @@ export default function LibrarianDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white">
+      <div className="bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {user?.first_name}! 📚
         </h1>

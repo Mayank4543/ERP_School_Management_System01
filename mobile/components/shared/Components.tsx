@@ -25,8 +25,12 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     style,
 }) => {
     const getButtonStyle = () => {
-        const baseStyles = [styles.button];
+        const baseStyles = [];
 
+        // Add base button style
+        baseStyles.push(styles.button);
+
+        // Add variant styles
         if (variant === 'primary') {
             baseStyles.push(styles.primaryButton);
         } else if (variant === 'secondary') {
@@ -35,22 +39,33 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
             baseStyles.push(styles.outlineButton);
         }
 
+        // Add size styles
         if (size === 'small') {
             baseStyles.push(styles.smallButton);
         } else if (size === 'large') {
             baseStyles.push(styles.largeButton);
         }
 
+        // Add disabled style
         if (disabled) {
             baseStyles.push(styles.disabledButton);
         }
 
-        return style ? [...baseStyles, style] : baseStyles;
+        // Add custom style if provided
+        if (style) {
+            baseStyles.push(style);
+        }
+
+        return baseStyles;
     };
 
     const getTextStyle = () => {
-        const baseStyles = [styles.buttonText];
+        const baseStyles = [];
 
+        // Add base text style
+        baseStyles.push(styles.buttonText);
+
+        // Add variant text styles
         if (variant === 'primary') {
             baseStyles.push(styles.primaryButtonText);
         } else if (variant === 'secondary') {
@@ -59,12 +74,14 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
             baseStyles.push(styles.outlineButtonText);
         }
 
+        // Add size text styles
         if (size === 'small') {
             baseStyles.push(styles.smallButtonText);
         } else if (size === 'large') {
             baseStyles.push(styles.largeButtonText);
         }
 
+        // Add disabled text style
         if (disabled) {
             baseStyles.push(styles.disabledButtonText);
         }

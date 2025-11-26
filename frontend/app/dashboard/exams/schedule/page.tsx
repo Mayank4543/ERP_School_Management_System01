@@ -1,207 +1,87 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, Users, BookOpen, Award } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Clock, Users, BookOpen, Award, Loader2, MapPin, User, Download } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import examsService from '@/lib/api/services/exams.service';
+
+interface ExamScheduleItem {
+  _id: string;
+  subject_id: string;
+  subject_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  total_marks: number;
+  passing_marks: number;
+  room?: string;
+  invigilator?: string;
+  standard: number;
+}
+
+interface DaySchedule {
+  date: string;
+  day: string;
+  exams: ExamScheduleItem[];
+}
 
 export default function ExamSchedulePage() {
-  const [selectedExam, setSelectedExam] = useState('midterm-2025');
+  const { user } = useAuth();
+  const [selectedExam, setSelectedExam] = useState('');
+  const [selectedStandard, setSelectedStandard] = useState('');
+  const [exams, setExams] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<DaySchedule[]>([]);
+  const [selectedExamData, setSelectedExamData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    totalDays: 0,
+    totalExams: 0,
+    totalStudents: 0,
+    totalInvigilators: 0,
+  });
 
-  const exams = [
-    { id: 'midterm-2025', name: 'Mid-Term Exam 2025' },
-    { id: 'final-2025', name: 'Final Exam 2025' },
-  ];
+  useEffect(() => {
+    fetchExams();
+  }, [user?.school_id]);
 
-  const schedule = [
-    {
-      date: '2025-12-01',
-      day: 'Monday',
-      exams: [
-        {
-          class: '10-A',
-          subject: 'Mathematics',
-          time: '09:00 AM - 12:00 PM',
-          room: 'Room 301',
-          invigilator: 'Mr. Sharma',
-          totalMarks: 100,
-        },
-        {
-          class: '9-A',
-          subject: 'Science',
-          time: '09:00 AM - 12:00 PM',
-          room: 'Room 302',
-          invigilator: 'Dr. Kumar',
-          totalMarks: 100,
-        },
-      ],
-    },
-    {
-      date: '2025-12-03',
-      day: 'Wednesday',
-      exams: [
-        {
-          class: '10-A',
-          subject: 'Physics',
-          time: '09:00 AM - 12:00 PM',
-          room: 'Room 301',
-          invigilator: 'Dr. Patel',
-          totalMarks: 100,
-        },
-        {
-          class: '9-A',
-          subject: 'English',
-          time: '09:00 AM - 12:00 PM',
-          room: 'Room 302',
-          invigilator: 'Ms. Gupta',
-          totalMarks: 100,
-        },
-      ],
-    },
-  ];
+  useEffect(() => {
+    if (selectedExam) {
+      fetchExamSchedule();
+    }
+  }, [selectedExam, selectedStandard]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Exam Schedule</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage exam timetables and halls</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Generate Hall Tickets</Button>
-          <Button>Create Schedule</Button>
-        </div>
-      </div>
+  const fetchExams = async () => {
+    if (!user?.school_id) return;
 
-      {/* Exam Selection */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-2">
-            {exams.map((exam) => (
-              <Button
-                key={exam.id}
-                variant={selectedExam === exam.id ? 'default' : 'outline'}
-                onClick={() => setSelectedExam(exam.id)}
-              >
-                {exam.name}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+    try {
+      const data = await examsService.getAll({
+        schoolId: user.school_id,
+        page: 1,
+        limit: 50,
+      });
+      setExams(data.data || []);
+    } catch (error) {
+      console.error('Error fetching exams:', error);
+      toast.error('Failed to fetch exams');
+    }
+  };
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Days</CardTitle>
-            <Calendar className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">10</div>
-          </CardContent>
-        </Card>
+  const fetchExamSchedule = async () => {
+    if (!selectedExam) return;
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Exams</CardTitle>
-            <BookOpen className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">45</div>
-          </CardContent>
-        </Card>
+    try {
+      setLoading(true);
+      const examData = await examsService.getById(selectedExam);
+      setSelectedExamData(examData);
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Students</CardTitle>
-            <Users className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">450</div>
-          </CardContent>
-        </Card>
+      // Generate schedule based on exam data
+      // In a real implementation, this would come from the backend
+      generateScheduleFromExam(examData);
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invigilators</CardTitle>
-            <Award className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">15</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Schedule */}
-      <div className="space-y-4">
-        {schedule.map((day) => (
-          <Card key={day.date}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                {day.day}, {day.date}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {day.exams.map((exam, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500">Class</p>
-                        <p className="font-semibold text-lg">{exam.class}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Subject</p>
-                        <p className="font-semibold">{exam.subject}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="text-sm text-gray-500">Time</p>
-                          <p className="font-medium">{exam.time}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Room & Invigilator</p>
-                        <p className="font-medium">{exam.room}</p>
-                        <p className="text-sm text-gray-600">{exam.invigilator}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Total Marks</p>
-                        <p className="font-semibold text-blue-600">{exam.totalMarks}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 ml-4">
-                      <Button size="sm" variant="outline">Edit</Button>
-                      <Button size="sm" variant="outline">Seating</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Button variant="outline">View Seating Arrangement</Button>
-            <Button variant="outline">Assign Invigilators</Button>
-            <Button variant="outline">Download Schedule PDF</Button>
-            <Button variant="outline">Send Notifications</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+    } catch (error) { \n      console.error('Error fetching exam schedule:', error); \n      toast.error('Failed to fetch exam schedule'); \n      \n      // Mock schedule data for demonstration\n      const mockSchedule: DaySchedule[] = [\n        {\n          date: '2025-12-01',\n          day: 'Monday',\n          exams: [\n            {\n              _id: '1',\n              subject_id: '1',\n              subject_name: 'Mathematics',\n              date: '2025-12-01',\n              start_time: '09:00',\n              end_time: '12:00',\n              total_marks: 100,\n              passing_marks: 40,\n              room: 'Room 301',\n              invigilator: 'Mr. Sharma',\n              standard: 10,\n            },\n            {\n              _id: '2',\n              subject_id: '2',\n              subject_name: 'Science',\n              date: '2025-12-01',\n              start_time: '09:00',\n              end_time: '12:00',\n              total_marks: 100,\n              passing_marks: 40,\n              room: 'Room 302',\n              invigilator: 'Dr. Kumar',\n              standard: 9,\n            },\n          ],\n        },\n        {\n          date: '2025-12-03',\n          day: 'Wednesday',\n          exams: [\n            {\n              _id: '3',\n              subject_id: '3',\n              subject_name: 'Physics',\n              date: '2025-12-03',\n              start_time: '09:00',\n              end_time: '12:00',\n              total_marks: 100,\n              passing_marks: 40,\n              room: 'Room 301',\n              invigilator: 'Dr. Patel',\n              standard: 10,\n            },\n            {\n              _id: '4',\n              subject_id: '4',\n              subject_name: 'English',\n              date: '2025-12-03',\n              start_time: '09:00',\n              end_time: '12:00',\n              total_marks: 100,\n              passing_marks: 40,\n              room: 'Room 302',\n              invigilator: 'Ms. Gupta',\n              standard: 9,\n            },\n          ],\n        },\n      ];\n      \n      setSchedule(mockSchedule);\n      setStats({\n        totalDays: mockSchedule.length,\n        totalExams: mockSchedule.reduce((sum, day) => sum + day.exams.length, 0),\n        totalStudents: 450, // Mock data\n        totalInvigilators: 15, // Mock data\n      });\n    } finally {\n      setLoading(false);\n    }\n  };\n\n  const generateScheduleFromExam = (examData: any) => {\n    // This function would process exam data and generate schedule\n    // For now, using mock data\n    console.log('Generating schedule for exam:', examData.name);\n  };\n\n  const handleExamChange = (examId: string) => {\n    setSelectedExam(examId);\n    const exam = exams.find(e => e._id === examId);\n    setSelectedExamData(exam);\n    setSchedule([]);\n  };\n\n  const formatTime = (time: string) => {\n    return time || '09:00';\n  };\n\n  const getExamStatus = (examDate: string) => {\n    const today = new Date();\n    const examDay = new Date(examDate);\n    \n    if (examDay > today) {\n      return { label: 'Upcoming', color: 'bg-blue-100 text-blue-800' };\n    } else if (examDay.toDateString() === today.toDateString()) {\n      return { label: 'Today', color: 'bg-green-100 text-green-800' };\n    } else {\n      return { label: 'Completed', color: 'bg-gray-100 text-gray-800' };\n    }\n  };\n\n  return (\n    <div className=\"space-y-6\">\n      <div className=\"flex items-center justify-between\">\n        <div>\n          <h1 className=\"text-3xl font-bold text-gray-900 dark:text-white\">Exam Schedule</h1>\n          <p className=\"text-gray-500 dark:text-gray-400 mt-1\">Manage exam timetables and halls</p>\n        </div>\n        <div className=\"flex gap-2\">\n          <Button variant=\"outline\">Generate Hall Tickets</Button>\n          <Button disabled={!selectedExam}>Create Schedule</Button>\n        </div>\n      </div>\n\n      {/* Exam Selection */}\n      <Card>\n        <CardContent className=\"pt-6\">\n          <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n            <div className=\"space-y-2\">\n              <label className=\"text-sm font-medium\">Select Exam</label>\n              <Select value={selectedExam} onValueChange={handleExamChange}>\n                <SelectTrigger>\n                  <SelectValue placeholder=\"Choose an exam to view schedule\" />\n                </SelectTrigger>\n                <SelectContent>\n                  {exams.map(exam => (\n                    <SelectItem key={exam._id} value={exam._id}>\n                      {exam.name} ({format(new Date(exam.start_date), 'MMM dd')} - {format(new Date(exam.end_date), 'MMM dd, yyyy')})\n                    </SelectItem>\n                  ))}\n                </SelectContent>\n              </Select>\n            </div>\n            <div className=\"space-y-2\">\n              <label className=\"text-sm font-medium\">Filter by Standard (Optional)</label>\n              <Select value={selectedStandard} onValueChange={setSelectedStandard}>\n                <SelectTrigger>\n                  <SelectValue placeholder=\"All standards\" />\n                </SelectTrigger>\n                <SelectContent>\n                  <SelectItem value=\"\">All Standards</SelectItem>\n                  <SelectItem value=\"10\">Class 10</SelectItem>\n                  <SelectItem value=\"9\">Class 9</SelectItem>\n                  <SelectItem value=\"8\">Class 8</SelectItem>\n                </SelectContent>\n              </Select>\n            </div>\n          </div>\n        </CardContent>\n      </Card>\n\n      {selectedExamData && (\n        <>\n          {/* Quick Stats */}\n          <div className=\"grid grid-cols-1 md:grid-cols-4 gap-4\">\n            <Card>\n              <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-2\">\n                <CardTitle className=\"text-sm font-medium\">Total Days</CardTitle>\n                <Calendar className=\"h-4 w-4 text-gray-600\" />\n              </CardHeader>\n              <CardContent>\n                <div className=\"text-2xl font-bold\">{stats.totalDays}</div>\n                <p className=\"text-xs text-muted-foreground\">\n                  {selectedExamData.start_date && selectedExamData.end_date ? (\n                    `${format(new Date(selectedExamData.start_date), 'MMM dd')} - ${format(new Date(selectedExamData.end_date), 'MMM dd')}`\n                  ) : (\n                    'Duration'\n                  )}\n                </p>\n              </CardContent>\n            </Card>\n\n            <Card>\n              <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-2\">\n                <CardTitle className=\"text-sm font-medium\">Total Exams</CardTitle>\n                <BookOpen className=\"h-4 w-4 text-gray-600\" />\n              </CardHeader>\n              <CardContent>\n                <div className=\"text-2xl font-bold\">{stats.totalExams}</div>\n                <p className=\"text-xs text-muted-foreground\">Scheduled subjects</p>\n              </CardContent>\n            </Card>\n\n            <Card>\n              <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-2\">\n                <CardTitle className=\"text-sm font-medium\">Students</CardTitle>\n                <Users className=\"h-4 w-4 text-gray-600\" />\n              </CardHeader>\n              <CardContent>\n                <div className=\"text-2xl font-bold\">{stats.totalStudents}</div>\n                <p className=\"text-xs text-muted-foreground\">Appearing candidates</p>\n              </CardContent>\n            </Card>\n\n            <Card>\n              <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-2\">\n                <CardTitle className=\"text-sm font-medium\">Invigilators</CardTitle>\n                <Award className=\"h-4 w-4 text-gray-600\" />\n              </CardHeader>\n              <CardContent>\n                <div className=\"text-2xl font-bold\">{stats.totalInvigilators}</div>\n                <p className=\"text-xs text-muted-foreground\">Assigned staff</p>\n              </CardContent>\n            </Card>\n          </div>\n\n          {/* Schedule */}\n          {loading ? (\n            <Card>\n              <CardContent className=\"flex items-center justify-center py-8\">\n                <Loader2 className=\"h-6 w-6 animate-spin\" />\n                <span className=\"ml-2\">Loading schedule...</span>\n              </CardContent>\n            </Card>\n          ) : schedule.length > 0 ? (\n            <div className=\"space-y-4\">\n              {schedule\n                .filter(day => {\n                  if (!selectedStandard) return true;\n                  return day.exams.some(exam => exam.standard.toString() === selectedStandard);\n                })\n                .map((day) => {\n                  const filteredExams = selectedStandard \n                    ? day.exams.filter(exam => exam.standard.toString() === selectedStandard)\n                    : day.exams;\n                  \n                  if (filteredExams.length === 0) return null;\n                  \n                  const status = getExamStatus(day.date);\n                  \n                  return (\n                    <Card key={day.date}>\n                      <CardHeader>\n                        <CardTitle className=\"flex items-center gap-3\">\n                          <Calendar className=\"h-5 w-5 text-blue-600\" />\n                          <span>{day.day}, {format(new Date(day.date), 'MMMM dd, yyyy')}</span>\n                          <Badge className={status.color}>{status.label}</Badge>\n                        </CardTitle>\n                      </CardHeader>\n                      <CardContent>\n                        <div className=\"space-y-3\">\n                          {filteredExams.map((exam, index) => (\n                            <div\n                              key={index}\n                              className=\"flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors\"\n                            >\n                              <div className=\"flex-1 grid grid-cols-1 md:grid-cols-6 gap-4\">\n                                <div>\n                                  <p className=\"text-sm text-gray-500\">Class</p>\n                                  <p className=\"font-semibold text-lg\">Class {exam.standard}</p>\n                                </div>\n                                <div>\n                                  <p className=\"text-sm text-gray-500\">Subject</p>\n                                  <p className=\"font-semibold\">{exam.subject_name}</p>\n                                  <p className=\"text-xs text-gray-600\">Marks: {exam.total_marks}</p>\n                                </div>\n                                <div className=\"flex items-start gap-2\">\n                                  <Clock className=\"h-4 w-4 text-gray-500 mt-0.5\" />\n                                  <div>\n                                    <p className=\"text-sm text-gray-500\">Time</p>\n                                    <p className=\"font-medium\">{formatTime(exam.start_time)} - {formatTime(exam.end_time)}</p>\n                                    <p className=\"text-xs text-gray-600\">3 hours</p>\n                                  </div>\n                                </div>\n                                <div className=\"flex items-start gap-2\">\n                                  <MapPin className=\"h-4 w-4 text-gray-500 mt-0.5\" />\n                                  <div>\n                                    <p className=\"text-sm text-gray-500\">Venue</p>\n                                    <p className=\"font-medium\">{exam.room || 'TBD'}</p>\n                                  </div>\n                                </div>\n                                <div className=\"flex items-start gap-2\">\n                                  <User className=\"h-4 w-4 text-gray-500 mt-0.5\" />\n                                  <div>\n                                    <p className=\"text-sm text-gray-500\">Invigilator</p>\n                                    <p className=\"font-medium\">{exam.invigilator || 'Not assigned'}</p>\n                                  </div>\n                                </div>\n                                <div>\n                                  <p className=\"text-sm text-gray-500\">Passing Marks</p>\n                                  <p className=\"font-semibold text-blue-600\">{exam.passing_marks}/{exam.total_marks}</p>\n                                </div>\n                              </div>\n                              <div className=\"flex flex-col gap-2 ml-4\">\n                                <Button size=\"sm\" variant=\"outline\">Edit</Button>\n                                <Button size=\"sm\" variant=\"outline\">Seating</Button>\n                              </div>\n                            </div>\n                          ))}\n                        </div>\n                      </CardContent>\n                    </Card>\n                  );\n                })\n              }\n            </div>\n          ) : (\n            <Card>\n              <CardContent className=\"text-center py-8\">\n                <BookOpen className=\"h-16 w-16 text-gray-400 mx-auto mb-4\" />\n                <p className=\"text-gray-500 text-lg mb-2\">No schedule available</p>\n                <p className=\"text-gray-400 text-sm\">The exam schedule will be generated once subjects and dates are configured.</p>\n              </CardContent>\n            </Card>\n          )}\n\n          {/* Actions */}\n          <Card>\n            <CardHeader>\n              <CardTitle>Quick Actions</CardTitle>\n            </CardHeader>\n            <CardContent>\n              <div className=\"grid grid-cols-2 md:grid-cols-4 gap-3\">\n                <Button variant=\"outline\" disabled={schedule.length === 0}>\n                  <MapPin className=\"mr-2 h-4 w-4\" />\n                  Seating Plan\n                </Button>\n                <Button variant=\"outline\" disabled={schedule.length === 0}>\n                  <User className=\"mr-2 h-4 w-4\" />\n                  Assign Staff\n                </Button>\n                <Button variant=\"outline\" disabled={schedule.length === 0}>\n                  <Download className=\"mr-2 h-4 w-4\" />\n                  Download PDF\n                </Button>\n                <Button variant=\"outline\" disabled={schedule.length === 0}>\n                  <Users className=\"mr-2 h-4 w-4\" />\n                  Send Notifications\n                </Button>\n              </div>\n            </CardContent>\n          </Card>\n        </>\n      )}\n    </div>\n  );\n}

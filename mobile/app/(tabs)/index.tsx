@@ -28,7 +28,7 @@ export default function DashboardScreen() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const data = await dashboardService.getDashboard(role, user?.id);
+      const data = await dashboardService.getDashboard(role || 'student', user?.id || '');
       setDashboardData(data);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load dashboard');
