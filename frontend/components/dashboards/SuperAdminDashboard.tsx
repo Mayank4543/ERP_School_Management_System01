@@ -1,29 +1,13 @@
 'use client';
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { superAdminService } from '@/lib/api/super-admin.service';
 import { toast } from 'sonner';
-import MultiSchoolSelector from '@/components/shared/MultiSchoolSelector';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  GraduationCap, 
-  UserCheck, 
-  School, 
-  TrendingUp, 
-  Activity,
-  Settings,
-  Database,
-  Shield,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Clock
-} from 'lucide-react';
+import {  Users, GraduationCap, UserCheck, School, RefreshCw,CheckCircle,XCircle} from 'lucide-react';
 
 interface SystemStats {
   totalUsers: number;
@@ -38,13 +22,7 @@ interface SystemStats {
   pendingApprovals: number;
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'user_registration' | 'teacher_added' | 'student_enrolled' | 'system_update';
-  message: string;
-  timestamp: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-}
+
 
 // Mock data for demonstration
 const mockStats: SystemStats = {

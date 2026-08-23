@@ -1,8 +1,8 @@
 {
-  "name": "gegok12-backend",
+  "name": "Erp12-backend",
   "version": "1.0.0",
-  "description": "GegoK12 ERP School Management System - NestJS Backend",
-  "author": "GegoK12 Team",
+  "description": "Erp School Management System - NestJS Backend",
+  "author": "Mayank4543",
   "license": "MIT",
   "scripts": {
     "build": "nest build",

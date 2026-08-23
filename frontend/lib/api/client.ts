@@ -13,7 +13,7 @@ const apiClient = axios.create({
 });
 
 // Request interceptor to add auth token
-apiClient.interceptors.request.use(
+apiClient.interceptors.request.use  (
   (config) => {
     const token = Cookies.get('access_token');
     if (token) {

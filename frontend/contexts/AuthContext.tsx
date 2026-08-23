@@ -36,18 +36,25 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Role mapping from backend to frontend
-const mapBackendRoleToFrontend = (backendRole: string): string => {
-  const roleMapping: { [key: string]: string } = {
-    'superadmin': 'super_admin',
-    'admin': 'school_admin',
-    'teacher': 'teacher',
-    'student': 'student',
-    'parent': 'parent',
-    'accountant': 'accountant',
-    'librarian': 'librarian',
-    'receptionist': 'receptionist',
-  };
+const roleMapping: Record<string, string> = {
+  superadmin: 'super_admin',
+  admin: 'school_admin',
+  teacher: 'teacher',
+  student: 'student',
+  parent: 'parent',
+  accountant: 'accountant',
+  librarian: 'librarian',
+  receptionist: 'receptionist',
+};
+
+const mapBackendRoleToFrontend = (backendRole?: string | null): string => {
+  if (!backendRole) return 'user';
   return roleMapping[backendRole] || backendRole;
+};
+
+const getPrimaryRole = (backendUser: any): string => {
+  const roles = [backendUser?.usergroup_id, ...(backendUser?.roles || [])].filter(Boolean) as string[];
+  return roles.includes('superadmin') ? 'superadmin' : roles[0] || 'user';
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -66,17 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = JSON.parse(userStr);
 
           // Migrate existing user data to new role format if needed
-          if (userData.role && typeof userData.role === 'string') {
-            const mappedRole = mapBackendRoleToFrontend(userData.role);
-            userData.role = mappedRole;
+          const primaryRole = getPrimaryRole(userData);
+          const mappedRole = mapBackendRoleToFrontend(primaryRole);
 
-            if (userData.roles && Array.isArray(userData.roles)) {
-              userData.roles = userData.roles.map((role: string) => mapBackendRoleToFrontend(role));
-            }
-
-            // Update stored user data with migrated roles
-            Cookies.set('user', JSON.stringify(userData), { expires: 7 });
+          userData.role = mappedRole;
+          if (userData.roles && Array.isArray(userData.roles)) {
+            userData.roles = userData.roles.map((role: string) => mapBackendRoleToFrontend(role));
           }
+
+          // Update stored user data with migrated roles
+          Cookies.set('user', JSON.stringify(userData), { expires: 7 });
 
           setUser(userData);
         }
@@ -108,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Cookies.set('access_token', access_token, { expires: 7 });
 
         // Transform backend user to frontend format
-        const primaryRole = backendUser.roles?.[0] || backendUser.usergroup_id;
+        const primaryRole = getPrimaryRole(backendUser);
         const mappedRole = mapBackendRoleToFrontend(primaryRole);
 
         const user: User = {
@@ -156,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Cookies.set('access_token', access_token, { expires: 7 });
 
         // Transform backend user to frontend format
-        const primaryRole = backendUser.roles?.[0] || backendUser.usergroup_id;
+        const primaryRole = getPrimaryRole(backendUser);
         const mappedRole = mapBackendRoleToFrontend(primaryRole);
 
         const user: User = {
@@ -201,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUser = (updatedFields: Partial<User>) => {
     if (!user) return;
-    
+
     const updatedUser = { ...user, ...updatedFields };
     setUser(updatedUser);
     Cookies.set('user', JSON.stringify(updatedUser), { expires: 7 });

@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 // MongoDB Connection
-const MONGODB_URI = 'mongodb+srv://mayankrathore9897_db_user:schoolmanagmentsystem1234365@cluster0.kepgm9e.mongodb.net/?appName=Cluster0' ;
+const MONGODB_URI = 'mongodb://localhost:27017/erp0098' ;
 
 const userSchema = new mongoose.Schema({
   name: String,

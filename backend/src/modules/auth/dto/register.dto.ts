@@ -2,17 +2,17 @@ import { IsEmail, IsNotEmpty, IsString, MinLength, IsMongoId, IsOptional } from 
 
 export class RegisterDto {
   @IsString()
-  @IsNotEmpty()
-  @MinLength(3)
+  @IsNotEmpty({ message: 'Name is required' })
+  @MinLength(3, { message: 'Name must be at least 3 characters long' })
   name: string;
 
-  @IsEmail()
-  @IsNotEmpty()
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
   email: string;
 
   @IsString()
-  @IsNotEmpty()
-  @MinLength(6)
+  @IsNotEmpty({ message: 'Password is required' })
+  @MinLength(6, { message: 'Password must be at least 6 characters long' })
   password: string;
 
   @IsMongoId()
@@ -20,10 +20,10 @@ export class RegisterDto {
   school_id?: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'User group is required' })
   usergroup_id: string;
 
   @IsString()
-  @IsOptional()
+  @IsOptional({ message: 'Mobile number is optional' })
   mobile_no?: string;
 }

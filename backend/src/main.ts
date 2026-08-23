@@ -38,7 +38,7 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('GegoK12 ERP API')
+    .setTitle(' ERP API')
     .setDescription('School ERP Management System - Complete API Documentation')
     .setVersion('1.0')
     .addBearerAuth(

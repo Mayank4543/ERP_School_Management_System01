@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Table,
   TableBody,
@@ -55,6 +55,9 @@ interface DataTableProps<T> {
   showExport?: boolean;
   showSearch?: boolean;
   emptyMessage?: string;
+  getRowKey?: (row: T, index: number) => string;
+  rowActions?: (row: T) => ReactNode;
+  rowActionsLabel?: string;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -71,10 +74,14 @@ export function DataTable<T extends Record<string, any>>({
   showExport = true,
   showSearch = true,
   emptyMessage = 'No data found',
+  getRowKey,
+  rowActions,
+  rowActionsLabel = 'Actions',
 }: DataTableProps<T>) {
   const [searchValue, setSearchValue] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const hasRowActions = Boolean(rowActions);
 
   const handleSearch = (value: string) => {
     setSearchValue(value);
@@ -136,6 +143,11 @@ export function DataTable<T extends Record<string, any>>({
                   {column.sortable && renderSortIcon(column.key)}
                 </TableHead>
               ))}
+              {hasRowActions && (
+                <TableHead className="text-right">
+                  {rowActionsLabel}
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -148,29 +160,40 @@ export function DataTable<T extends Record<string, any>>({
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
+                  {hasRowActions && (
+                    <TableCell>
+                      <Skeleton className="h-4 w-20 ml-auto" />
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             ) : data.length === 0 ? (
               // Empty state
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
+                <TableCell
+                  colSpan={columns.length + (hasRowActions ? 1 : 0)}
+                  className="text-center py-8 text-gray-500"
+                >
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
               // Data rows
               data.map((row, rowIndex) => {
-                // Use _id if available, otherwise fall back to index
-                const uniqueKey = row._id || row.id || `row-${rowIndex}`;
+                // Use the caller's key strategy first, then fall back to common ids.
+                const uniqueKey = getRowKey?.(row, rowIndex) || row._id || row.id || `row-${rowIndex}`;
                 return (
                   <TableRow key={uniqueKey}>
                     {columns.map((column) => (
                       <TableCell key={column.key}>
                         {column.render
                           ? column.render(row[column.key], row)
-                          : row[column.key] || '-'}
+                          : row[column.key] ?? '-'}
                       </TableCell>
                     ))}
+                    {hasRowActions && (
+                      <TableCell className="text-right">{rowActions?.(row)}</TableCell>
+                    )}
                   </TableRow>
                 );
               })
