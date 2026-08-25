@@ -123,11 +123,10 @@ export default function StudentsPage() {
         status: filters.status,
       });
 
-      console.log('✅ Students API Response:', response);
-      console.log('📊 Sample student raw data:', response.data[0]);
+      
 
       if (response.success) {
-        console.log('✅ Students loaded with complete data from backend');
+       
         setStudents(response.data);
         setPagination({
           page: response.page,

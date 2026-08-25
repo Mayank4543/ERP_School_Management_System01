@@ -1,5 +1,12 @@
 import { superAdminSchoolService, type CreateSchoolPayload, type UpdateSchoolPayload } from '@/lib/api/services/super-admin/school.service';
 
+export enum SchoolStatus {
+    PENDING = 'pending',
+    APPROVED = 'approved',
+    REJECTED = 'rejected',
+    SUSPENDED = 'suspended',
+}
+
 export interface SchoolListItem {
     _id: string;
     name: string;
@@ -11,7 +18,7 @@ export interface SchoolListItem {
     pincode?: string;
     board?: string;
     website?: string;
-    status: boolean;
+    status: SchoolStatus;
     user_count?: number;
     student_count?: number;
     teacher_count?: number;
@@ -22,7 +29,12 @@ export async function getSchools(): Promise<SchoolListItem[]> {
     const response = await superAdminSchoolService.getAllSchools({ limit: 100 });
 
     if (response.success && response.data?.schools) {
-        return response.data.schools as SchoolListItem[];
+        return (response.data.schools as Array<SchoolListItem & { status: SchoolStatus | boolean }>).map((school) => ({
+            ...school,
+            status: typeof school.status === 'boolean'
+                ? school.status ? SchoolStatus.APPROVED : SchoolStatus.PENDING
+                : school.status,
+        }));
     }
 
     throw new Error(response.message || 'Failed to load schools');

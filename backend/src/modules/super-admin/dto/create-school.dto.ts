@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsEmail, Length, IsBoolean, IsUrl, MaxLength, Matches } from 'class-validator';
-
+import { IsString, IsOptional, IsEmail, Length, IsEnum, IsUrl, MaxLength, Matches } from 'class-validator';
+import { SchoolStatus } from '../../schools/schemas/school.schema';
+import { Transform } from 'class-transformer';
 export class CreateSchoolDto {
   @IsString()
   @Length(2, 100, { message: 'School Name must be between 2 and 100 characters' })
@@ -41,12 +42,13 @@ export class CreateSchoolDto {
   board?: string;
 
   @IsOptional()
-  @IsUrl()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsUrl({}, { message: 'Please enter a valid website URL' })
   website?: string;
 
   @IsOptional()
-  @IsBoolean()
-  status?: boolean;
+  @IsEnum(SchoolStatus)
+  status?: SchoolStatus;
 
   @IsOptional()
   @IsString()

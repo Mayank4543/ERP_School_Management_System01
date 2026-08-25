@@ -6,12 +6,13 @@ import { GetUser } from '../auth/decorators/get-user.decorator';
 import { SuperAdminService } from './super-admin.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { RejectSchoolDto } from './dto/reject-school.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('superadmin')
 export class SuperAdminController {
-  constructor(private readonly superAdminService: SuperAdminService) {}
+  constructor(private readonly superAdminService: SuperAdminService) { }
 
   @Get('test')
   async test() {
@@ -58,12 +59,16 @@ export class SuperAdminController {
   }
 
   @Post('schools/:schoolId/reject')
-  async rejectSchool(@GetUser() user: any, @Param('schoolId') schoolId: string) {
-    return this.superAdminService.rejectSchool(schoolId);
+  async rejectSchool(
+    @GetUser() user: any,
+    @Param('schoolId') schoolId: string,
+    @Body() rejectSchoolDto: RejectSchoolDto,
+  ) {
+    return this.superAdminService.rejectSchool(schoolId, rejectSchoolDto.reason);
   }
 
   // ==================== USERS MANAGEMENT ====================
-  
+
   @Get('users')
   async getAllUsers(@GetUser() user: any, @Query() query: any) {
     return this.superAdminService.getAllUsers(query);
@@ -193,7 +198,7 @@ export class SuperAdminController {
 
   @Patch('schools/:schoolId')
   async updateSchool(
-    @GetUser() user: any, 
+    @GetUser() user: any,
     @Param('schoolId') schoolId: string,
     @Body() schoolData: UpdateSchoolDto
   ) {

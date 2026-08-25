@@ -175,17 +175,7 @@ export function SchoolFormDialog({
                             {errors.city && <p className="text-sm text-red-600">{errors.city.message}</p>}
                         </div>
 
-                        <div className="space-y-2 md:col-span-2">
-                            <label className="text-sm font-medium">
-                                Address
-                            </label>
 
-                            <Input
-                                {...register('address')}
-                                placeholder="Enter address"
-                            />
-                            {errors.address && <p className="text-sm text-red-600">{errors.address.message}</p>}
-                        </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">
                                 State

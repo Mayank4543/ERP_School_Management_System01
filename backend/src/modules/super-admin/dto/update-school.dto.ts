@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsEmail, IsBoolean,Length,MaxLength,Matches, IsUrl } from 'class-validator';
-
+import { IsString, IsOptional, IsEmail, IsEnum, Length, MaxLength, Matches, IsUrl } from 'class-validator';
+import { SchoolStatus } from '../../schools/schemas/school.schema';
+import { Transform } from 'class-transformer';
 export class UpdateSchoolDto {
   @IsOptional()
   @IsString()
@@ -14,8 +15,8 @@ export class UpdateSchoolDto {
   @IsOptional()
   @IsString()
   @Matches(/^[6-9]\d{9}$/, {
-      message: 'Phone must be a valid 10-digit Indian phone number',
-    })
+    message: 'Phone must be a valid 10-digit Indian phone number',
+  })
   phone?: string;
 
   @IsOptional()
@@ -36,8 +37,8 @@ export class UpdateSchoolDto {
   @IsOptional()
   @IsString()
   @Matches(/^\d{6}$/, {
-      message: 'Pincode must be exactly 6 digits',
-    })
+    message: 'Pincode must be exactly 6 digits',
+  })
   pincode?: string;
 
   @IsOptional()
@@ -46,12 +47,13 @@ export class UpdateSchoolDto {
   board?: string;
 
   @IsOptional()
-  @IsUrl()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsUrl({}, { message: 'Please enter a valid website URL' })
   website?: string;
 
   @IsOptional()
-  @IsBoolean()
-  status?: boolean;
+  @IsEnum(SchoolStatus)
+  status?: SchoolStatus;
 
   @IsOptional()
   @IsString()

@@ -1,64 +1,28 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, School, MoreVertical, Eye, Pencil, Trash2, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger} from '@/components/ui/dropdown-menu';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 import { toast } from 'sonner';
-import { getSchools, deleteSchool, type SchoolListItem } from './api';
+import { getSchools, deleteSchool, SchoolStatus, type SchoolListItem } from './api';
 import { SchoolFormDialog } from './components/SchoolFormDialog';
-type SchoolStatusFilter = 'all' | 'approved' | 'pending';
+type SchoolStatusFilter = 'all' | SchoolStatus;
+
 export default function SchoolsPage() {
   const router = useRouter();
   const [schools, setSchools] = useState<SchoolListItem[]>([]);
-  const [filteredSchools, setFilteredSchools] = useState<SchoolListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<SchoolStatusFilter>('all');
   const [editSchool, setEditSchool] = useState<SchoolListItem | null>(null);
   const [addSchoolOpen, setAddSchoolOpen] = useState(false);
-  useEffect(() => {
-    loadSchools();
-  }, []);
-
-  useEffect(() => {
-    const query = searchTerm.trim().toLowerCase();
-
-    const filtered = schools.filter((school) => {
-      if (statusFilter === 'approved' && school.status !== true) {
-        return false;
-      }
-
-      if (statusFilter === 'pending' && school.status !== false) {
-        return false;
-      }
-      if (!query) return true;
-
-      return [
-        school.name,
-        school.email,
-        school.phone,
-        school.address,
-        school.state,
-        school.city,
-        school.pincode,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query));
-    });
-
-    setFilteredSchools(filtered);
-  }, [schools, searchTerm, statusFilter]);
+  const [deleteSchoolTarget, setDeleteSchoolTarget] = useState<SchoolListItem | null>(null);
 
   const loadSchools = async () => {
     try {
@@ -74,11 +38,31 @@ export default function SchoolsPage() {
     }
   };
 
+  useEffect(() => {
+    loadSchools();
+  }, []);
+
+  const query = searchTerm.trim().toLowerCase();
+  const filteredSchools = schools.filter((school) => {
+    if (statusFilter !== 'all' && school.status !== statusFilter) {
+      return false;
+    }
+    if (!query) return true;
+
+    return [
+      school.name,
+      school.email,
+      school.phone,
+      school.address,
+      school.state,
+      school.city,
+      school.pincode,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query));
+  });
+
   const handleDeleteSchool = async (school: SchoolListItem) => {
-
-    const confirmed = window.confirm(`Delete ${school.name}? This action cannot be undone.`);
-    if (!confirmed) return;
-
     try {
       const response = await deleteSchool(school._id);
       if (response.success) {
@@ -144,14 +128,21 @@ export default function SchoolsPage() {
     {
       key: 'status',
       label: 'Status',
-      render: (_, school) => (
-        <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${school.status ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-            }`}
-        >
-          {school.status ? 'Approved' : 'Pending'}
-        </span>
-      ),
+      render: (_, school) => {
+        const status = school.status ?? SchoolStatus.PENDING; 
+        return (
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${status === SchoolStatus.APPROVED
+                ? 'bg-green-100 text-green-700'
+                : status === SchoolStatus.PENDING
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+          >
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </span>
+        );
+      },
     },
   ];
 
@@ -186,8 +177,10 @@ export default function SchoolsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value={SchoolStatus.APPROVED}>Approved</SelectItem>
+            <SelectItem value={SchoolStatus.PENDING}>Pending</SelectItem>
+            <SelectItem value={SchoolStatus.REJECTED}>Rejected</SelectItem>
+            <SelectItem value={SchoolStatus.SUSPENDED}>Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -220,7 +213,7 @@ export default function SchoolsPage() {
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDeleteSchool(school)} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={() => setDeleteSchoolTarget(school)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -228,6 +221,26 @@ export default function SchoolsPage() {
           </DropdownMenu>
         )}
 
+      />
+      <ConfirmDialog
+        open={!!deleteSchoolTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteSchoolTarget(null);
+        }}
+        onConfirm={async () => {
+          if (deleteSchoolTarget) {
+            await handleDeleteSchool(deleteSchoolTarget);
+            setDeleteSchoolTarget(null);
+          }
+        }}
+        title="Delete school?"
+        description={
+          deleteSchoolTarget
+            ? `Delete ${deleteSchoolTarget.name}? This action cannot be undone.`
+            : 'This action cannot be undone.'
+        }
+        confirmLabel="Delete"
+        destructive
       />
       <SchoolFormDialog
         school={editSchool}

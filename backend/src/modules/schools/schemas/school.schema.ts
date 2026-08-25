@@ -4,6 +4,13 @@ import { Transform } from 'class-transformer';
 
 export type SchoolDocument = School & Document;
 
+export enum SchoolStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  SUSPENDED = 'suspended',
+}
+
 @Schema({ timestamps: true, collection: 'schools' })
 export class School {
   @Transform(({ value }) => value.toString())
@@ -42,8 +49,17 @@ export class School {
   @Prop({ unique: true, trim: true, lowercase: true })
   slug: string;
 
-  @Prop({ default: true })
-  status: boolean;
+  @Prop({ type: String, enum: Object.values(SchoolStatus), default: SchoolStatus.PENDING })
+  status: SchoolStatus;
+
+  @Prop({ type: Date })
+  approved_at: Date;
+
+  @Prop({ type: Date })
+  rejected_at: Date;
+
+  @Prop({ trim: true, maxlength: 500 })
+  rejection_reason: string;
 
   @Prop()
   logo: string;

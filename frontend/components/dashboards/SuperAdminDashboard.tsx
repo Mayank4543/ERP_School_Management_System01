@@ -24,25 +24,22 @@ interface SystemStats {
 
 
 
-// Mock data for demonstration
-const mockStats: SystemStats = {
-  totalUsers: 1250,
-  totalStudents: 980,
-  totalTeachers: 85,
-  totalSchools: 12,
-  activeUsers: 156,
-  systemHealth: 'good',
-  serverUptime: '15d 8h 42m',
-  databaseSize: '2.4 GB',
-  todayRegistrations: 8,
-  pendingApprovals: 3,
-};
-
 
 export default function SuperAdminDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<SystemStats>(mockStats);
-  
+  const [stats, setStats] = useState<SystemStats>({
+    totalUsers: 0,
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalSchools: 0,
+    activeUsers: 0,
+    systemHealth: 'good',
+    serverUptime: '0d 0h 0m',
+    databaseSize: '0 GB',
+    todayRegistrations: 0,
+    pendingApprovals: 0
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 

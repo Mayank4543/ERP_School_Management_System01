@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException,ValidationPipe,} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -30,8 +30,28 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+
       transformOptions: {
         enableImplicitConversion: true,
+      },
+
+      exceptionFactory: (validationErrors) => {
+        const errors: Record<string, string> = {};
+
+        validationErrors.forEach((error) => {
+          const constraints = error.constraints;
+
+          if (constraints) {
+            errors[error.property] = Object.values(constraints)[0];
+          }
+        });
+
+        return new BadRequestException({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Please correct the highlighted fields.',
+          errors,
+        });
       },
     }),
   );

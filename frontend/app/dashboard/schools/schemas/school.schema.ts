@@ -50,7 +50,6 @@ export const SchoolSchema =z.object({
 
   website: z
     .string()
-    .trim()
     .url('Please enter a valid website URL')
     .optional()
     .or(z.literal('')),

@@ -13,28 +13,42 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
+    const responseBody =
+      typeof exceptionResponse === 'string'
+        ? {
+          message: exceptionResponse,
+        }
+        : exceptionResponse as Record<string, any>;
+
     const errorResponse: ApiResponse = {
       success: false,
+
       error: {
-        code: `ERROR_${status}`,
+        code:
+          responseBody.code ||
+          `ERROR_${status}`,
+
         message:
-          typeof exceptionResponse === 'string'
-            ? exceptionResponse
-            : (exceptionResponse as any).message || 'An error occurred',
-        details:
-          typeof exceptionResponse === 'object'
-            ? (exceptionResponse as any).error
-            : undefined,
+          responseBody.message ||
+          'An error occurred',
+
+        details: responseBody.details,
+
+        // Important: preserve validation errors
+        errors: responseBody.errors,
       },
+
       timestamp: new Date().toISOString(),
     };
 
     response.status(status).json(errorResponse);
   }
 }
+
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -47,18 +61,44 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    const exceptionResponse =
       exception instanceof HttpException
-        ? exception.message
-        : 'Internal server error';
+        ? exception.getResponse()
+        : null;
+
+    const responseBody =
+      typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+        ? exceptionResponse as Record<string, any>
+        : null;
+
+    const message =
+      typeof exceptionResponse === 'string'
+        ? exceptionResponse
+        : responseBody?.message ||
+        (exception instanceof Error
+          ? exception.message
+          : 'Internal server error');
 
     const errorResponse: ApiResponse = {
       success: false,
+
       error: {
-        code: `ERROR_${status}`,
+        code:
+          responseBody?.code ||
+          `ERROR_${status}`,
+
         message,
-        details: exception instanceof Error ? exception.stack : undefined,
+
+        details:
+          responseBody?.details ||
+          (exception instanceof Error
+            ? exception.stack
+            : undefined),
+
+        errors: responseBody?.errors,
       },
+
       timestamp: new Date().toISOString(),
     };
 

@@ -5,6 +5,7 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { Teacher, TeacherDocument } from '../teachers/schemas/teacher.schema';
 import { School } from '../schools/schemas/school.schema';
 import { CreateSchoolDto } from './dto/create-school.dto';
+import { SchoolStatus } from '../schools/schemas/school.schema';
 import { UpdateSchoolDto } from './dto/update-school.dto';
 
 @Injectable()
@@ -14,7 +15,7 @@ export class SuperAdminService {
     @InjectModel(Teacher.name) private teacherModel: Model<TeacherDocument>,
     @InjectModel(School.name) private schoolModel: Model<any>,
     @InjectModel('Student') private studentModel: Model<any>,
-  ) {}
+  ) { }
 
   async getDashboardStats() {
     try {
@@ -23,8 +24,8 @@ export class SuperAdminService {
         this.studentModel.countDocuments({ deleted_at: null }),
         this.teacherModel.countDocuments({ deleted_at: null }),
         this.schoolModel.countDocuments({ deleted_at: null }),
-        this.userModel.countDocuments({ 
-          deleted_at: null, 
+        this.userModel.countDocuments({
+          deleted_at: null,
           last_login: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
         })
       ]);
@@ -72,7 +73,7 @@ export class SuperAdminService {
     try {
       const memoryUsage = process.memoryUsage();
       const uptime = process.uptime();
-      
+
       return {
         success: true,
         data: {
@@ -166,11 +167,11 @@ export class SuperAdminService {
         .exec();
 
       const pendingSchools = await this.schoolModel
-        .find({ status: false, deleted_at: null })
+        .find({ status: SchoolStatus.PENDING, deleted_at: null })
         .select('name email createdAt')
         .sort({ createdAt: -1 })
         .exec();
-
+      console.log("pending schools", pendingSchools);
       return {
         success: true,
         data: {
@@ -194,7 +195,7 @@ export class SuperAdminService {
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
       const filter: any = { deleted_at: null };
-      
+
       if (search) {
         filter.$or = [
           { name: { $regex: search, $options: 'i' } },
@@ -203,7 +204,7 @@ export class SuperAdminService {
       }
 
       if (status !== undefined) {
-        filter.status = parseInt(status);
+        filter.status = status;
       }
 
       const [schools, total] = await Promise.all([
@@ -242,20 +243,20 @@ export class SuperAdminService {
       const { limit = 50, page = 1 } = query;
       const skip = (page - 1) * limit;
 
-      // Get schools that are not yet approved (status: false or pending approval)
+      // Get schools that are awaiting approval.
       const schools = await this.schoolModel
-        .find({ 
-          status: false,
+        .find({
+          status: SchoolStatus.PENDING,
           deleted_at: { $exists: false }
         })
-        .populate('user_id', 'name email phone')
+        .populate( 'name email phone')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean();
 
-      const total = await this.schoolModel.countDocuments({ 
-        status: false,
+      const total = await this.schoolModel.countDocuments({
+        status: SchoolStatus.PENDING,
         deleted_at: { $exists: false }
       });
 
@@ -274,7 +275,7 @@ export class SuperAdminService {
       return {
         success: true,
         data: {
-          schools: transformedSchools,
+          schools: schools,
           total,
           page: parseInt(page),
           limit: parseInt(limit),
@@ -293,10 +294,23 @@ export class SuperAdminService {
   async approveSchool(schoolId: string) {
     try {
       const school = await this.schoolModel
+
         .findByIdAndUpdate(
-          schoolId,
-          { status: true, approved_at: new Date() },
-          { new: true }
+          {
+            _id: schoolId,
+            status: SchoolStatus.PENDING,
+            deleted_at: null,
+          },
+          {
+            $set: {
+              status: SchoolStatus.APPROVED,
+              approved_at: new Date(),
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          },
         )
         .exec();
 
@@ -321,15 +335,16 @@ export class SuperAdminService {
     }
   }
 
-  async rejectSchool(schoolId: string) {
+  async rejectSchool(schoolId: string, reason: string) {
     try {
       const school = await this.schoolModel
         .findByIdAndUpdate(
           schoolId,
-          { 
-            status: false, 
+          {
+            status: SchoolStatus.REJECTED,
             rejected_at: new Date(),
-            deleted_at: new Date() // Soft delete rejected schools
+            rejection_reason: reason.trim(),
+          
           },
           { new: true }
         )
@@ -363,13 +378,13 @@ export class SuperAdminService {
       const { page = 1, limit = 10, search, role, status, school_id } = query;
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const filter: any = { 
+      const filter: any = {
         $or: [
           { deleted_at: null },
           { deleted_at: { $exists: false } }
         ]
       };
-      
+
       if (search) {
         filter.$and = filter.$and || [];
         filter.$and.push({
@@ -463,7 +478,7 @@ export class SuperAdminService {
       }
 
       const user = await this.userModel.create(userData);
-      
+
       // Remove password from response
       const userResponse = user.toObject();
       delete userResponse.password;
@@ -600,13 +615,13 @@ export class SuperAdminService {
   async resetUserPassword(userId: string, newPassword: string) {
     try {
       const hashedPassword = await require('bcrypt').hash(newPassword, 10);
-      
+
       const user = await this.userModel
         .findOneAndUpdate(
           { _id: new Types.ObjectId(userId), deleted_at: null },
-          { 
+          {
             password: hashedPassword,
-            password_reset_required: true 
+            password_reset_required: true
           },
           { new: true }
         );
@@ -638,14 +653,14 @@ export class SuperAdminService {
       const { page = 1, limit = 10, search, school_id } = query;
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const filter: any = { 
+      const filter: any = {
         $or: [
           { deleted_at: null },
           { deleted_at: { $exists: false } }
         ],
         usergroup_id: { $in: ['admin', 'superadmin'] }
       };
-      
+
       if (search) {
         filter.$and = filter.$and || [];
         filter.$and.push({
@@ -731,7 +746,7 @@ export class SuperAdminService {
       }
 
       const admin = await this.userModel.create(adminData);
-      
+
       // Remove password from response
       const adminResponse = admin.toObject();
       delete adminResponse.password;
@@ -760,8 +775,8 @@ export class SuperAdminService {
   async getAdmin(adminId: string) {
     try {
       const admin = await this.userModel
-        .findOne({ 
-          _id: new Types.ObjectId(adminId), 
+        .findOne({
+          _id: new Types.ObjectId(adminId),
           deleted_at: null,
           usergroup_id: { $in: ['admin', 'superadmin'] }
         })
@@ -804,8 +819,8 @@ export class SuperAdminService {
 
       const admin = await this.userModel
         .findOneAndUpdate(
-          { 
-            _id: new Types.ObjectId(adminId), 
+          {
+            _id: new Types.ObjectId(adminId),
             deleted_at: null,
             usergroup_id: { $in: ['admin', 'superadmin'] }
           },
@@ -848,8 +863,8 @@ export class SuperAdminService {
     try {
       const admin = await this.userModel
         .findOneAndUpdate(
-          { 
-            _id: new Types.ObjectId(adminId), 
+          {
+            _id: new Types.ObjectId(adminId),
             deleted_at: null,
             usergroup_id: { $in: ['admin', 'superadmin'] }
           },
@@ -881,8 +896,8 @@ export class SuperAdminService {
     try {
       const admin = await this.userModel
         .findOneAndUpdate(
-          { 
-            _id: new Types.ObjectId(adminId), 
+          {
+            _id: new Types.ObjectId(adminId),
             deleted_at: null,
             usergroup_id: { $in: ['admin', 'superadmin'] }
           },
@@ -1007,7 +1022,7 @@ export class SuperAdminService {
     try {
       // In a real implementation, this would trigger an actual backup process
       const backupId = new Types.ObjectId().toString();
-      
+
       return {
         success: true,
         message: 'System backup initiated successfully',
@@ -1029,7 +1044,7 @@ export class SuperAdminService {
   async getSystemLogs(query: any) {
     try {
       const { page = 1, limit = 50, level, startDate, endDate } = query;
-      
+
       // In a real implementation, this would query actual log files or log database
       const mockLogs = [
         {
@@ -1090,7 +1105,7 @@ export class SuperAdminService {
       };
 
       // Here you would save to notification collection and broadcast
-      
+
       return {
         success: true,
         message: 'Notification broadcasted successfully',
@@ -1128,7 +1143,7 @@ export class SuperAdminService {
         website: schoolData.website,
         logo: schoolData.logo,
         slug: slug,
-        status: schoolData.status !== undefined ? schoolData.status : true // Auto-approve for SuperAdmin
+        status: SchoolStatus.PENDING,
       });
 
       return {
@@ -1169,21 +1184,21 @@ export class SuperAdminService {
       }
 
       // Get user counts for this school
-      const userCount = await this.userModel.countDocuments({ 
-        school_id: schoolId, 
-        deleted_at: { $exists: false } 
+      const userCount = await this.userModel.countDocuments({
+        school_id: schoolId,
+        deleted_at: { $exists: false }
       });
-      
-      const studentCount = await this.userModel.countDocuments({ 
+
+      const studentCount = await this.userModel.countDocuments({
         school_id: schoolId,
         usergroup_id: 'student',
-        deleted_at: { $exists: false } 
+        deleted_at: { $exists: false }
       });
-      
-      const teacherCount = await this.userModel.countDocuments({ 
+
+      const teacherCount = await this.userModel.countDocuments({
         school_id: schoolId,
         usergroup_id: 'teacher',
-        deleted_at: { $exists: false } 
+        deleted_at: { $exists: false }
       });
 
       return {
@@ -1208,7 +1223,7 @@ export class SuperAdminService {
     try {
       // Prepare update data, only include provided fields
       const updateData: any = {};
-      
+
       if (schoolData.name !== undefined) {
         updateData.name = schoolData.name;
         // Update slug if name changes
@@ -1270,9 +1285,9 @@ export class SuperAdminService {
   async deleteSchool(schoolId: string) {
     try {
       // Soft delete school and all related data
-      await this.schoolModel.findByIdAndUpdate(schoolId, { 
+      await this.schoolModel.findByIdAndUpdate(schoolId, {
         deleted_at: new Date(),
-        status: false 
+        status: SchoolStatus.SUSPENDED
       });
 
       // Also soft delete all users from this school
@@ -1319,9 +1334,9 @@ export class SuperAdminService {
   async globalUserSearch(query: any) {
     try {
       const { search, school_id, role, limit = 50 } = query;
-      
+
       const filter: any = { deleted_at: null };
-      
+
       if (search) {
         filter.$or = [
           { name: { $regex: search, $options: 'i' } },
@@ -1387,7 +1402,7 @@ export class SuperAdminService {
     try {
       // Log the emergency shutdown
       console.error(`EMERGENCY SHUTDOWN INITIATED: ${reason}`);
-      
+
       // In real implementation, this would:
       // 1. Notify all active users
       // 2. Save all pending data
@@ -1455,7 +1470,7 @@ export class SuperAdminService {
           { $unwind: '$school' },
           { $project: { school_name: '$school.name', user_count: '$count' } }
         ]),
-        
+
         this.teacherModel.aggregate([
           { $match: { deleted_at: null } },
           { $group: { _id: '$school_id', count: { $sum: 1 } } }
@@ -1492,7 +1507,7 @@ export class SuperAdminService {
 
       const result = await this.userModel.updateMany(
         { _id: { $in: userIds.map(id => new Types.ObjectId(id)) } },
-        { 
+        {
           password: hashedPassword,
           password_reset_required: true,
           password_reset_token: new Types.ObjectId().toString()
@@ -1519,7 +1534,7 @@ export class SuperAdminService {
   // Helper methods
   private calculateSystemHealth(totalUsers: number, activeUsers: number): string {
     const activityRatio = totalUsers > 0 ? (activeUsers / totalUsers) * 100 : 0;
-    
+
     if (activityRatio > 20) return 'excellent';
     if (activityRatio > 10) return 'good';
     if (activityRatio > 5) return 'warning';
@@ -1535,7 +1550,7 @@ export class SuperAdminService {
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    
+
     return `${days}d ${hours}h ${minutes}m`;
   }
 
@@ -1551,7 +1566,7 @@ export class SuperAdminService {
   private getRelativeTime(date: Date): string {
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
