@@ -1,32 +1,15 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { superAdminService } from '@/lib/api/super-admin.service';
+import { superAdminDashboardService, type SystemStats } from '@/lib/api/services/super-admin/dashboard.service';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {  Users, GraduationCap, UserCheck, School, RefreshCw,CheckCircle,XCircle} from 'lucide-react';
-
-interface SystemStats {
-  totalUsers: number;
-  totalStudents: number;
-  totalTeachers: number;
-  totalSchools: number;
-  activeUsers: number;
-  systemHealth: 'excellent' | 'good' | 'warning' | 'critical';
-  serverUptime: string;
-  databaseSize: string;
-  todayRegistrations: number;
-  pendingApprovals: number;
-}
-
-
-
-
+import { Users, GraduationCap, UserCheck, School, RefreshCw, CheckCircle, XCircle, Activity } from 'lucide-react';
+import {Tabs,TabsContent,TabsList,TabsTrigger} from "@/components/ui/tabs"
 export default function SuperAdminDashboard() {
-  const { user } = useAuth();
+
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalStudents: 0,
@@ -46,60 +29,29 @@ export default function SuperAdminDashboard() {
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch schools data
-      const schoolsResponse = await superAdminService.getAllSchools({ limit: 100 });
-      const schools = schoolsResponse.data?.schools || [];
-      
-      // Fetch users data
-      const usersResponse = await superAdminService.getAllUsers({ limit: 100 });
-      const users = usersResponse.data?.users || [];
-      
-      // Calculate dynamic stats
-      const totalSchools = schools.length;
-      const totalUsers = users.length;
-      const activeUsers = users.filter((u: any) => u.is_activated).length;
-      
-      const totalStudents = users.filter((u: any) => 
-        u.usergroup_id === 'student' || u.roles?.includes('student')
-      ).length;
-      
-      const totalTeachers = users.filter((u: any) => 
-        u.usergroup_id === 'teacher' || u.roles?.includes('teacher')
-      ).length;
-      
-      const todayRegistrations = users.filter((u: any) => {
-        const createdDate = new Date(u.createdAt);
-        const today = new Date();
-        return createdDate.toDateString() === today.toDateString();
-      }).length;
-      
-      // Update stats with real data
+
+      const response = await superAdminDashboardService.getDashboardStats();
+
+      if (!response.data) {
+        return ({
+          success: false,
+          message: response.data || 'Failed to fetch dashboard stats'
+        })
+      }
+      const school = response.data;
       setStats({
-        totalUsers,
-        totalStudents,
-        totalTeachers,
-        totalSchools,
-        activeUsers,
+        totalUsers: school.totalUsers,
+        totalStudents: school.totalStudents,
+        totalTeachers: school.totalTeachers,
+        totalSchools: school.totalSchools,
+        activeUsers: school.activeUsers,
         systemHealth: 'good',
         serverUptime: '15d 8h 42m',
         databaseSize: '2.4 GB',
-        todayRegistrations,
+        todayRegistrations: school.todayRegistrations,
         pendingApprovals: 3,
       });
-      
-      // Generate recent activities from actual data
-      const recentUserActivities = users
-        .slice(0, 5)
-        .map((user: any, index: number) => ({
-          id: `activity-${index}`,
-          type: 'user_registration' as const,
-          message: `New ${user.usergroup_id || 'user'} registered: ${user.name}`,
-          timestamp: formatTimestamp(user.createdAt),
-          priority: 'medium' as const
-        }));
-      
-   
-      
+
       toast.success('Dashboard data updated');
     } catch (error: any) {
       console.error('Backend connection failed:', error);
@@ -108,21 +60,23 @@ export default function SuperAdminDashboard() {
       setIsLoading(false);
     }
   }, []);
-
-  const formatTimestamp = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 60) return `${diffMins} minutes ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    return `${diffDays} days ago`;
-  };
+  const recentActivity = useCallback(async () => {
+    try {
+      const response = await superAdminDashboardService.getRecentActivities();
+      console.log('Recent Activity Response:', response.data);
+      if (!response.data) {
+        return ({
+          success: false,
+          message: response.data || 'Failed to fetch recent activity'
+        })
+      }
+    } catch (error: any) {
+      console.error('Error fetching recent activity:', error);
+    }
+  }, []);
 
   useEffect(() => {
+    recentActivity();
     fetchDashboardData();
   }, [fetchDashboardData, refreshKey]);
 
@@ -134,24 +88,10 @@ export default function SuperAdminDashboard() {
     );
   }
 
+
   return (
     <div className="space-y-6">
-      {/* Multi-School Selector */}
-      {/* <MultiSchoolSelector 
-       
-        onSchoolChange={() => {
-        
-          setRefreshKey(prev => prev + 1);
-          // Add small delay to ensure backend is updated
-          setTimeout(() => {
-            fetchDashboardData();
-          }, 500);
-        }}
-        showCreateButton={true}
-        showGlobalView={true}
-      /> */}
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -222,7 +162,7 @@ export default function SuperAdminDashboard() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
 
         {/* Pending Approvals */}
         <Card className="border-gray-200 shadow-sm">
@@ -252,7 +192,7 @@ export default function SuperAdminDashboard() {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
               <div>
                 <p className="text-sm font-medium text-gray-900">1 Admin Application</p>
@@ -267,6 +207,18 @@ export default function SuperAdminDashboard() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+        {/* Recent Activity */}
+        <Card className="border-gray-200 shadow-sm">
+          <CardHeader className="border-b border-gray-100">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <Activity className="h-5 w-5 text-blue-600" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-500">No recent activity</p>
           </CardContent>
         </Card>
       </div>
